@@ -1,0 +1,9 @@
+[
+    {
+        "channel_name": "Test Channel 1",
+        "watch_folder": "input_videos",
+        "proxy": "",
+        "cookies_path": "auth/cookies_channel1.json",
+        "upload_frequency_per_day": 1
+    }
+]

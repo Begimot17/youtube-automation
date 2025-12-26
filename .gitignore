@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment Variables & Keys
+.env
+.env.local
+credentials.json
+
+# IDEs
+.idea/
+.vscode/
+
+# Project Specific
+output/
+input_videos/
+auth/*.json
+!auth/.gitkeep
+
+# System
+.DS_Store
+Thumbs.db

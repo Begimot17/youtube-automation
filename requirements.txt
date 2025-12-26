@@ -1,0 +1,11 @@
+playwright
+schedule
+python-dotenv
+moviepy
+openai
+requests
+fastapi
+uvicorn
+openai-whisper
+gspread
+google-auth

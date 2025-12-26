@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # The Python Automation Brain
+  app:
+    build: .
+    image: youtube-automation:latest
+    container_name: youtube_auto_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # Expose API
+    environment:
+      - OPENAI_API_KEY=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
+      - PEXELS_API_KEY=Nzcx8kjRsvrZzgMpsPD2xq94fDxRvNejB1SapEbTGHlJdYkRgdII4Cjw
+    volumes:
+      - ./output:/app/output
+      - ./input_videos:/app/input_videos # Mount watch folder
+      - ./auth:/app/auth         # Important: Mount cookies from host
+      - ./config:/app/config     # Share config
+      # - ./src:/app/src         # Optional: Live reload for dev
+    command: python src/server.py # Or src/scheduler.py
+
+  # N8N Orchestrator
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: youtube_auto_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:
