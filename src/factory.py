@@ -1,15 +1,18 @@
+import logging
 import os
 import time
 
 from src.gen import script_generator, subtitles, tts, visuals
 from src.rendering.engine import VideoRenderer
 
+logger = logging.getLogger(__name__)
+
 
 def create_content(topic, channel_name="TestChannel"):
     """
     Full pipeline to create a video from a topic.
     """
-    print(f"🚀 Starting content creation for: {topic}")
+    logger.info(f"Starting content creation for: {topic}")
 
     # Paths
     base_dir = f"output/{channel_name}/{int(time.time())}"
@@ -19,25 +22,25 @@ def create_content(topic, channel_name="TestChannel"):
     video_output = f"{base_dir}/final.mp4"
 
     # 1. Script
-    print("\n--- Step 1: generating Script ---")
+    logger.info("Step 1: generating Script")
     script_data = script_generator.generate_script(topic)
     if not script_data:
         return
 
     script_text = script_data.get("script", "")
-    print(f"Script length: {len(script_text)} chars")
+    logger.info(f"Script length: {len(script_text)} chars")
 
     # 2. Audio
-    print("\n--- Step 2: Generating Audio ---")
+    logger.info("Step 2: Generating Audio")
     if not tts.generate_voiceover(script_text, audio_path):
         return
 
     # 3. Subtitles
-    print("\n--- Step 3: Generating Subtitles ---")
+    logger.info("Step 3: Generating Subtitles")
     subs = subtitles.generate_subtitles(audio_path)
 
     # 4. Visuals
-    print("\n--- Step 4: Fetching Visuals ---")
+    logger.info("Step 4: Fetching Visuals")
     visual_paths = []
     scenes = script_data.get("scenes", [])
     for i, scene in enumerate(scenes):
@@ -53,20 +56,20 @@ def create_content(topic, channel_name="TestChannel"):
         if downloaded:
             visual_paths.append(downloaded)
         else:
-            print(f"Warning: Could not download visual for {query}")
+            logger.warning(f"Could not download visual for {query}")
 
     if not visual_paths:
-        print("Error: No visuals downloaded.")
+        logger.error("No visuals downloaded.")
         return
 
     # 5. Assemble
-    print("\n--- Step 5: Assembling Video ---")
+    logger.info("Step 5: Assembling Video")
     renderer = VideoRenderer()
     renderer.assemble_short(
         audio_path, visual_paths, subtitles=subs, output_path=video_output
     )
 
-    print(f"\n✅ Video created successfully: {video_output}")
+    logger.info(f"Video created successfully: {video_output}")
     return video_output
 
 

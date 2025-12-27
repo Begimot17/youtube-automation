@@ -1,7 +1,10 @@
 import asyncio
+import logging
 import os
 
 import yt_dlp
+
+logger = logging.getLogger(__name__)
 
 
 class TikTokDownloader:
@@ -29,7 +32,7 @@ class TikTokDownloader:
             "no_warnings": True,
         }
 
-        print(f"🔍 Fetching latest {count} videos for @{username}...")
+        logger.info(f"Fetching latest {count} videos for @{username}...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
                 info = ydl.extract_info(url, download=False)
@@ -37,7 +40,7 @@ class TikTokDownloader:
                     return info["entries"]
                 return []
             except Exception as e:
-                print(f"❌ Failed to fetch video list: {e}")
+                logger.error(f"Failed to fetch video list: {e}")
                 return []
 
     async def get_user_videos(
@@ -75,12 +78,13 @@ class TikTokDownloader:
             if video_id:
                 video_url = f"https://www.tiktok.com/video/{video_id}"
             else:
-                print("❌ No URL found in video data.")
+                logger.error("No URL found in video data.")
                 return False
 
+        logger.info(f"Downloading {video_url}...")
         await asyncio.to_thread(self.download_video_sync, video_url, output_path)
         if os.path.exists(output_path):
-            print(f"✅ Video saved to: {output_path}")
+            logger.info(f"✅ Video saved to: {output_path}")
             return True
         return False
 
@@ -93,12 +97,12 @@ class TikTokDownloader:
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
-        print(f"🎬 Syncing channel: @{username}...")
+        logger.info(f"Syncing channel: @{username}...")
         videos = await self.get_user_videos(username, count)
 
         if not videos:
-            print(
-                f"⚠️ No videos found for @{username}. Check if account exists or is public."
+            logger.warning(
+                f"No videos found for @{username}. Check if account exists or is public."
             )
             return
 
@@ -110,16 +114,16 @@ class TikTokDownloader:
             output_path = os.path.join(output_folder, f"{username}_{video_id}.mp4")
 
             if os.path.exists(output_path):
-                print(f"⏩ Video {video_id} already exists, skipping.")
+                logger.info(f"Video {video_id} already exists, skipping.")
                 continue
 
-            print(f"📥 Downloading video {i + 1}/{len(videos)}: {video_id}...")
+            logger.info(f"Downloading video {i + 1}/{len(videos)}: {video_id}...")
             try:
                 success = await self.download_video(video, output_path)
                 if not success:
-                    print(f"❌ Failed to download {video_id}")
+                    logger.error(f"Failed to download {video_id}")
             except Exception as e:
-                print(f"❌ Error downloading {video_id}: {e}")
+                logger.error(f"Error downloading {video_id}: {e}")
 
 
 if __name__ == "__main__":

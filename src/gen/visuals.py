@@ -1,8 +1,11 @@
+import logging
 import os
 import random
 from pathlib import Path
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 # Headers for Pexels API
 # Get key from: https://www.pexels.com/api/
@@ -17,7 +20,7 @@ def search_pexels_videos(
     Returns a list of video objects (dict).
     """
     if not PEXELS_API_KEY:
-        print("Error: PEXELS_API_KEY not found.")
+        logger.error("PEXELS_API_KEY not found.")
         return []
 
     url = "https://api.pexels.com/videos/search"
@@ -44,7 +47,7 @@ def search_pexels_videos(
         return valid_videos
 
     except Exception as e:
-        print(f"Error searching Pexels: {e}")
+        logger.error(f"Error searching Pexels: {e}")
         return []
 
 
@@ -53,7 +56,7 @@ def download_video(video_url, output_path):
     Downloads video from URL to output_path.
     """
     try:
-        print(f"Downloading visual: {output_path}...")
+        logger.info(f"Downloading visual: {output_path}...")
         response = requests.get(video_url, stream=True)
         response.raise_for_status()
 
@@ -67,7 +70,7 @@ def download_video(video_url, output_path):
         return str(output_path)
 
     except Exception as e:
-        print(f"Error downloading video: {e}")
+        logger.error(f"Error downloading video: {e}")
         return None
 
 
@@ -75,11 +78,11 @@ def get_stock_footage(keyword, output_filename):
     """
     High-level function to find and download a stock video for a keyword.
     """
-    print(f"Finding footage for: {keyword}")
+    logger.info(f"Finding footage for: {keyword}")
     videos = search_pexels_videos(keyword)
 
     if not videos:
-        print(f"No videos found for {keyword}, trying fallback...")
+        logger.info(f"No videos found for {keyword}, trying fallback...")
         videos = search_pexels_videos("abstract background")
 
     if videos:

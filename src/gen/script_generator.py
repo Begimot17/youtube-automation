@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 
 from openai import OpenAI
 
 # Initialize Client
 # Assumes OPENAI_API_KEY is set in environment variables
+logger = logging.getLogger(__name__)
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 DEFAULT_PROMPT = """
@@ -26,7 +29,7 @@ def generate_script(topic):
     """
     Generates a YouTube Shorts script for the given topic using GPT-4o.
     """
-    print(f"Generating script for topic: {topic}...")
+    logger.info(f"Generating script for topic: {topic}...")
 
     try:
         response = client.chat.completions.create(
@@ -46,7 +49,7 @@ def generate_script(topic):
         return script_data
 
     except Exception as e:
-        print(f"Error generating script: {e}")
+        logger.error(f"Error generating script: {e}")
         return None
 
 

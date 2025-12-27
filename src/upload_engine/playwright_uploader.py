@@ -1,7 +1,10 @@
+import logging
 import os
 import time
 
 from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
 
 
 def upload_video_via_browser(
@@ -17,7 +20,7 @@ def upload_video_via_browser(
         cookies_path (str): Path to the JSON cookies file or None.
         headless (bool): Whether to run in headless mode.
     """
-    print(f"Starting upload for: {video_path}")
+    logger.info(f"Starting upload for: {video_path}")
 
     if proxy:
         # Initial primitive parsing for proxy, usually expected as dictionary by Playwright
@@ -32,7 +35,8 @@ def upload_video_via_browser(
         ]
 
         # Launch browser
-        browser = p.chromium.launch(headless=headless, args=browser_args)
+        logger.info(f"Launching browser (headless={headless})...")
+        browser = p.chromium.launch(headless=headless, args=browser_args, slow_mo=500)
 
         # Create context with storage state (cookies) if available
         context_options = {
@@ -41,9 +45,9 @@ def upload_video_via_browser(
         }
         if cookies_path and os.path.exists(cookies_path):
             context_options["storage_state"] = cookies_path
-            print(f"Loaded cookies from {cookies_path}")
+            logger.info(f"Loaded cookies from {cookies_path}")
         else:
-            print("No cookies found. Automation might fail if not logged in.")
+            logger.warning("No cookies found. Automation might fail if not logged in.")
 
         if proxy:
             # context_options["proxy"] = {"server": proxy} # need robust parsing
@@ -54,23 +58,23 @@ def upload_video_via_browser(
 
         try:
             # 1. Go to upload page
-            print("Navigating to YouTube upload page...")
+            logger.info("Navigating to YouTube upload page...")
             page.goto("https://www.youtube.com/upload", timeout=90000)
+            logger.info(f"Current URL: {page.url}")
 
             # Check if login is needed
             if "accounts.google.com" in page.url:
-                print("Login required. Cookies might be invalid.")
+                logger.error("Login required. Cookies might be invalid.")
                 # For MVP, we stop here or ask user to login manually and save cookies
                 # Creating a 'pause' here for manual intervention if not headless could be an option
                 if not headless:
-                    print("Please log in manually in the opened window...")
+                    logger.info("Please log in manually in the opened window...")
                     page.pause()
                 else:
                     raise Exception("Login required but running headless.")
 
             # 2. Select file
-            # YouTube Studio uses a specific input type=file, usually hidden
-            print("Selecting file...")
+            logger.info("Selecting file...")
             with page.expect_file_chooser() as fc_info:
                 page.click("#select-files-button")
 
@@ -78,13 +82,13 @@ def upload_video_via_browser(
             file_chooser.set_files(video_path)
 
             # 3. Wait for upload to start and metadata form to appear
-            print("Waiting for upload interface...")
+            logger.info("Waiting for upload interface...")
             # Use more robust selectors that are language-independent
             title_input = page.locator("#title-textarea #textbox")
             title_input.wait_for(timeout=60000)
 
             # 4. Fill Metadata
-            print("Filling metadata...")
+            logger.info("Filling metadata...")
             title_input.fill(metadata.get("title", "New Video"))
 
             # Description
@@ -92,7 +96,7 @@ def upload_video_via_browser(
             desc_input.fill(metadata.get("description", "Uploaded via automation"))
 
             # Scroll to audience section if needed and select "No, it's not made for kids"
-            print("Setting audience...")
+            logger.info("Setting audience...")
             not_for_kids_radio = page.locator(
                 "tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK']"
             )
@@ -100,33 +104,36 @@ def upload_video_via_browser(
             not_for_kids_radio.click()
 
             # Click Next until we reach Visibility
-            # Logic: find 'Next' button, click, wait for animation
-            # YouTube Studio has multiple tabs: Details -> Video elements -> Checks -> Visibility
             for i in range(3):
-                print(f"Clicking Next ({i + 1}/3)...")
+                logger.info(f"Clicking Next ({i + 1}/3)...")
                 page.click("#next-button")
                 time.sleep(2)
 
             # 5. Visibility: Public
-            print("Setting visibility to Public...")
+            logger.info("Setting visibility to Public...")
             public_radio = page.locator("tp-yt-paper-radio-button[name='PUBLIC']")
             public_radio.scroll_into_view_if_needed()
             public_radio.click()
 
             # Publish
-            print("Publishing...")
+            logger.info("Publishing...")
             publish_button = page.locator("#done-button")
             publish_button.click()
 
-            print("Upload completed!")
+            logger.info("Upload completed!")
 
             # 5. Save cookies if successful usage? (Optional)
             if cookies_path:
                 context.storage_state(path=cookies_path)
 
         except Exception as e:
-            print(f"Error during upload: {e}")
-            page.screenshot(path="error_upload.png")
+            logger.error(f"Error during upload: {e}")
+            try:
+                if not page.is_closed():
+                    page.screenshot(path="error_upload.png")
+            except Exception:
+                pass
             raise e
         finally:
+            logger.info("Closing browser...")
             browser.close()

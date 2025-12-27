@@ -1,3 +1,4 @@
+import logging
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
@@ -6,6 +7,8 @@ from moviepy.editor import (
     VideoFileClip,
     concatenate_videoclips,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VideoRenderer:
@@ -20,7 +23,7 @@ class VideoRenderer:
         """
         Creates a simple test video (colors + text) to verify MoviePy is working.
         """
-        print(f"Rendering test video to {output_path}...")
+        logger.info(f"Rendering test video to {output_path}...")
 
         # 1. Create a background (solid color for now, logic for file later)
         # Duration: 5 seconds
@@ -44,13 +47,13 @@ class VideoRenderer:
 
             final_clip = CompositeVideoClip([bg_clip, txt_clip])
         except Exception as e:
-            print(f"Warning: TextClip failed (ImageMagick missing?). Error: {e}")
-            print("Rendering without text.")
+            logger.warning(f"TextClip failed (ImageMagick missing?). Error: {e}")
+            logger.info("Rendering without text.")
             final_clip = bg_clip
 
         # 3. Write file
         final_clip.write_videofile(output_path, fps=24)
-        print("Done.")
+        logger.info("Done.")
 
     def assemble_short(
         self, audio_path, visual_paths, subtitles=None, output_path="output.mp4"
@@ -63,7 +66,7 @@ class VideoRenderer:
             subtitles: List of word objects (optional).
             output_path: Destination file.
         """
-        print("Assembling video...")
+        logger.info("Assembling video...")
 
         # 1. Audio
         audio = AudioFileClip(audio_path)
@@ -115,7 +118,7 @@ class VideoRenderer:
                 visual_index += 1
 
             except Exception as e:
-                print(f"Error loading clip {v_path}: {e}")
+                logger.error(f"Error loading clip {v_path}: {e}")
                 # Fallback to black screen if visual fails
                 if not clips and current_duration == 0:
                     clips.append(
@@ -134,7 +137,7 @@ class VideoRenderer:
         if subtitles:
             # Very basic implementation: TextClip for chunks of words
             # Real "MrBeast" style needs complex dynamic positioning logic
-            print("Adding subtitles...")
+            logger.info("Adding subtitles...")
             text_clips = []
             for word in subtitles:
                 txt = word["word"]
@@ -161,7 +164,7 @@ class VideoRenderer:
                     )
                     text_clips.append(txt_clip)
                 except Exception as e:
-                    print(f"Subtitle error: {e}")
+                    logger.error(f"Subtitle error: {e}")
 
             if text_clips:
                 final_video = CompositeVideoClip([final_video] + text_clips)
@@ -170,7 +173,7 @@ class VideoRenderer:
         final_video.write_videofile(
             output_path, fps=24, codec="libx264", audio_codec="aac"
         )
-        print(f"Video saved to {output_path}")
+        logger.info(f"Video saved to {output_path}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,10 @@
 import argparse
+import logging
 import os
 
 from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
 
 
 def login_and_save_cookies(output_path, cdp_url=None):
@@ -11,8 +14,8 @@ def login_and_save_cookies(output_path, cdp_url=None):
     """
     with sync_playwright() as p:
         if cdp_url:
-            print(f"🔌 Connecting to existing browser at {cdp_url}...")
-            print(
+            logger.info(f"Connecting to existing browser at {cdp_url}...")
+            logger.info(
                 "Ensure you followed the instructions to launch Chrome with --remote-debugging-port=9222"
             )
             try:
@@ -24,14 +27,14 @@ def login_and_save_cookies(output_path, cdp_url=None):
                 else:
                     page = context.new_page()
             except Exception as e:
-                print(f"❌ Connection failed: {e}")
-                print(
+                logger.error(f"Connection failed: {e}")
+                logger.info(
                     'Did you launch Chrome? Command: start chrome --remote-debugging-port=9222 --user-data-dir="C:\\chrome_debug_temp"'
                 )
                 return
         else:
             # Standard launch (often detected by Google)
-            print("🚀 Launching new browser (Bot mode)...")
+            logger.info("Launching new browser (Bot mode)...")
             browser = p.chromium.launch(
                 headless=False, args=["--disable-blink-features=AutomationControlled"]
             )
@@ -41,7 +44,7 @@ def login_and_save_cookies(output_path, cdp_url=None):
             )
             page = context.new_page()
 
-        print("🌐 Navigating to YouTube...")
+        logger.info("Navigating to YouTube...")
         page.goto("https://www.youtube.com/upload")
 
         print("\n" + "=" * 40)
@@ -55,12 +58,12 @@ def login_and_save_cookies(output_path, cdp_url=None):
         # Save state
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         context.storage_state(path=output_path)
-        print(f"✅ Cookies saved to: {output_path}")
+        logger.info(f"Cookies saved to: {output_path}")
 
         if not cdp_url:
             browser.close()
         else:
-            print("You can now close the Chrome window.")
+            logger.info("You can now close the Chrome window.")
 
 
 if __name__ == "__main__":

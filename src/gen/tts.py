@@ -1,7 +1,10 @@
+import logging
 import os
 from pathlib import Path
 
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -16,7 +19,7 @@ def generate_voiceover(text, output_path, voice="onyx", model="tts-1"):
         voice (str): OpenAI voice option (alloy, echo, fable, onyx, nova, shimmer).
         model (str): 'tts-1' (faster) or 'tts-1-hd' (better quality).
     """
-    print(f"Generating voiceover: {text[:30]}...")
+    logger.info(f"Generating voiceover: {text[:30]}...")
 
     try:
         response = client.audio.speech.create(model=model, voice=voice, input=text)
@@ -26,11 +29,11 @@ def generate_voiceover(text, output_path, voice="onyx", model="tts-1"):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         response.stream_to_file(output_path)
-        print(f"Audio saved to {output_path}")
+        logger.info(f"Audio saved to {output_path}")
         return output_path
 
     except Exception as e:
-        print(f"Error generating voiceover: {e}")
+        logger.error(f"Error generating voiceover: {e}")
         return None
 
 

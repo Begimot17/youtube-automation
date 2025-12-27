@@ -1,6 +1,9 @@
+import logging
 import os
 
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -10,7 +13,7 @@ def generate_subtitles(audio_path):
     Transcribes audio using Whisper to get word-level timestamps.
     Returns the verbose JSON object.
     """
-    print(f"Transcribing audio: {audio_path}...")
+    logger.info(f"Transcribing audio: {audio_path}...")
     try:
         with open(audio_path, "rb") as audio_file:
             transcript = client.audio.transcriptions.create(
@@ -21,7 +24,7 @@ def generate_subtitles(audio_path):
             )
         return transcript.words  # List of {'word':str, 'start':float, 'end':float}
     except Exception as e:
-        print(f"Error generating subtitles: {e}")
+        logger.error(f"Error generating subtitles: {e}")
         return []
 
 

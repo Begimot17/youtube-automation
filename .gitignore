@@ -30,3 +30,4 @@ auth/*.json
 Thumbs.db
 
 data/
+logs/

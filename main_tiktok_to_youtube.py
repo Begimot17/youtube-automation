@@ -1,9 +1,15 @@
 import asyncio
 import json
+import logging
 import os
 
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import upload_video_via_browser
+from src.utils.logging_config import setup_logging
+
+# Configure logging
+setup_logging()
+logger = logging.getLogger("main")
 
 CONFIG_PATH = "config/channels.json"
 HISTORY_PATH = "config/upload_history.json"
@@ -48,17 +54,17 @@ async def process_channel(channel, downloader, history):
     proxy = channel.get("proxy")
 
     if not tiktok_sources:
-        print(f"ℹ️ No TikTok sources for {channel_name}")
+        logger.info(f"No TikTok sources for {channel_name}")
         return
 
-    print(f"\n🚀 Processing channel: {channel_name}")
+    logger.info(f"Processing channel: {channel_name}")
 
     for tt_user in tiktok_sources:
-        print(f"--- Checking TikTok: @{tt_user} ---")
+        logger.info(f"--- Checking TikTok: @{tt_user} ---")
         videos = await downloader.get_user_videos(tt_user, count=3)
 
         if not videos:
-            print(f"⚠️ No videos found for @{tt_user}")
+            logger.warning(f"No videos found for @{tt_user}")
             continue
 
         for video in videos:
@@ -67,17 +73,17 @@ async def process_channel(channel, downloader, history):
                 continue
 
             if is_video_processed(history, channel_name, video_id):
-                # print(f"⏩ Video {video_id} already processed, skipping.")
+                # logger.debug(f"Video {video_id} already processed, skipping.")
                 continue
 
-            print(f"🌟 New video found: {video_id}")
+            logger.info(f"New video found: {video_id}")
 
             # 1. Download
             output_path = os.path.join(watch_folder, f"{tt_user}_{video_id}.mp4")
             success = await downloader.download_video(video, output_path)
 
             if not success:
-                print(f"❌ Failed to download {video_id}")
+                logger.error(f"Failed to download {video_id}")
                 continue
 
             # 2. Upload to YouTube
@@ -95,7 +101,7 @@ async def process_channel(channel, downloader, history):
                 "description": f"Original video by @{tt_user} on TikTok. #shorts #tiktok #trending",
             }
 
-            print(f"📤 Uploading to YouTube: {yt_title}")
+            logger.info(f"Uploading to YouTube: {yt_title}")
             try:
                 # Playwright sync API cannot be called directly inside an asyncio loop.
                 # We wrap it in to_thread to run it in a separate thread.
@@ -111,14 +117,14 @@ async def process_channel(channel, downloader, history):
                 # 3. Mark as processed
                 mark_video_processed(history, channel_name, video_id)
                 save_history(history)
-                print(f"✅ Successfully processed {video_id}")
+                logger.info(f"Successfully processed {video_id}")
 
             except Exception as e:
-                print(f"❌ Error uploading {video_id}: {e}")
+                logger.error(f"Error uploading {video_id}: {e}")
 
 
 async def main():
-    print("🤖 Starting TikTok to YouTube Sync Automation (Verification Run)")
+    logger.info("Starting TikTok to YouTube Sync Automation (Verification Run)")
     downloader = TikTokDownloader()
 
     # while True:
@@ -129,11 +135,11 @@ async def main():
         for channel in channels:
             await process_channel(channel, downloader, history)
 
-        print("\n✅ Verification cycle complete.")
+        logger.info("Verification cycle complete.")
         # await asyncio.sleep(3600)  # Check every hour
 
     except Exception as e:
-        print(f"❌ Global error in main loop: {e}")
+        logger.error(f"Global error in main loop: {e}")
         # await asyncio.sleep(60)
 
 
