@@ -1,4 +1,5 @@
 import logging
+
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
