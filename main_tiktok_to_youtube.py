@@ -19,7 +19,7 @@ def load_history():
         try:
             with open(HISTORY_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 

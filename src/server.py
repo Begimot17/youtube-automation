@@ -1,4 +1,3 @@
-
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI
 from pydantic import BaseModel

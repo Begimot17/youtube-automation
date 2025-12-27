@@ -19,7 +19,6 @@ def upload_video_via_browser(
     """
     print(f"Starting upload for: {video_path}")
 
-    proxy_config = None
     if proxy:
         # Initial primitive parsing for proxy, usually expected as dictionary by Playwright
         # For simplicity, assuming the user provides it in a format Playwright accepts or handles split manually

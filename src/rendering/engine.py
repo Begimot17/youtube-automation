@@ -1,4 +1,3 @@
-
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
@@ -7,50 +6,6 @@ from moviepy.editor import (
     VideoFileClip,
     concatenate_videoclips,
 )
-
-
-class VideoRenderer:
-    def __init__(self, resolution=(1080, 1920)):
-        """
-        Initialize renderer. Default resolution is 1080x1920 (9:16 Short).
-        """
-        self.width = resolution[0]
-        self.height = resolution[1]
-
-    def create_test_video(self, output_path, text="Hello World"):
-        """
-        Creates a simple test video (colors + text) to verify MoviePy is working.
-        """
-        print(f"Rendering test video to {output_path}...")
-
-        # 1. Create a background (solid color for now, logic for file later)
-        # Duration: 5 seconds
-        bg_clip = ColorClip(
-            size=(self.width, self.height), color=(0, 0, 255), duration=5
-        )
-
-        # 2. Add Text
-        # Note: TextClip requires ImageMagick binary on Windows usually.
-        # Fallback to simple composition if TextClip fails might be needed,
-        # but for this specific "Text on Screen" requirement, ImageMagick is crucial.
-        try:
-            txt_clip = TextClip(
-                text,
-                fontsize=70,
-                color="white",
-                size=(self.width, None),
-                method="caption",
-            )
-            txt_clip = txt_clip.set_position("center").set_duration(5)
-
-            final_clip = CompositeVideoClip([bg_clip, txt_clip])
-        except Exception as e:
-            print(f"Warning: TextClip failed (ImageMagick missing?). Error: {e}")
-            print("Rendering without text.")
-
-
-
-from moviepy.editor import *
 
 
 class VideoRenderer:
