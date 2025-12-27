@@ -2,10 +2,13 @@ import time
 import os
 from playwright.sync_api import sync_playwright
 
-def upload_video_via_browser(video_path, metadata, proxy=None, cookies_path=None, headless=False):
+
+def upload_video_via_browser(
+    video_path, metadata, proxy=None, cookies_path=None, headless=False
+):
     """
     Uploads a video to YouTube using Playwright.
-    
+
     Args:
         video_path (str): Absolute path to the video file.
         metadata (dict): Dictionary containing 'title', 'description', etc.
@@ -14,23 +17,27 @@ def upload_video_via_browser(video_path, metadata, proxy=None, cookies_path=None
         headless (bool): Whether to run in headless mode.
     """
     print(f"Starting upload for: {video_path}")
-    
+
     proxy_config = None
     if proxy:
         # Initial primitive parsing for proxy, usually expected as dictionary by Playwright
         # For simplicity, assuming the user provides it in a format Playwright accepts or handles split manually
         # This is a placeholder for robust proxy parsing
-        pass 
+        pass
 
     with sync_playwright() as p:
-        browser_args = []
-        
+        # Standard stealth arguments
+        browser_args = [
+            "--disable-blink-features=AutomationControlled",
+        ]
+
         # Launch browser
         browser = p.chromium.launch(headless=headless, args=browser_args)
-        
+
         # Create context with storage state (cookies) if available
         context_options = {
-            "viewport": {"width": 1280, "height": 720}
+            "viewport": {"width": 1280, "height": 720},
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
         if cookies_path and os.path.exists(cookies_path):
             context_options["storage_state"] = cookies_path
@@ -41,14 +48,15 @@ def upload_video_via_browser(video_path, metadata, proxy=None, cookies_path=None
         if proxy:
             # context_options["proxy"] = {"server": proxy} # need robust parsing
             pass
-            
+
         context = browser.new_context(**context_options)
         page = context.new_page()
 
         try:
             # 1. Go to upload page
-            page.goto("https://www.youtube.com/upload")
-            
+            print("Navigating to YouTube upload page...")
+            page.goto("https://www.youtube.com/upload", timeout=90000)
+
             # Check if login is needed
             if "accounts.google.com" in page.url:
                 print("Login required. Cookies might be invalid.")
@@ -64,52 +72,58 @@ def upload_video_via_browser(video_path, metadata, proxy=None, cookies_path=None
             # YouTube Studio uses a specific input type=file, usually hidden
             print("Selecting file...")
             with page.expect_file_chooser() as fc_info:
-                page.click("#select-files-button") # Common ID, might vary
-                # Fallback: sometimes it's a label or different locator
-            
+                page.click("#select-files-button")
+
             file_chooser = fc_info.value
             file_chooser.set_files(video_path)
-            
+
             # 3. Wait for upload to start and metadata form to appear
             print("Waiting for upload interface...")
-            # Wait for the title input to verify the modal is up
-            page.wait_for_selector("#textbox[aria-label='Add a title that describes your video (required)']", timeout=60000)
+            # Use more robust selectors that are language-independent
+            title_input = page.locator("#title-textarea #textbox")
+            title_input.wait_for(timeout=60000)
 
             # 4. Fill Metadata
-            # Title (YouTube usually pre-fills filename, we might overwrite)
-            title_input = page.locator("#textbox[aria-label='Add a title that describes your video (required)']")
+            print("Filling metadata...")
             title_input.fill(metadata.get("title", "New Video"))
-            
+
             # Description
-            desc_input = page.locator("#textbox[aria-label='Tell viewers about your video (type @ to mention a channel)']")
+            desc_input = page.locator("#description-textarea #textbox")
             desc_input.fill(metadata.get("description", "Uploaded via automation"))
 
-            # Simple flow: Next -> Next -> Next -> Public -> Publish
-            # This is fragile and depends on the specific YT Studio flow (Copyright check etc)
-            
-            # Select "No, it's not made for kids" usually required
-            page.click("name=VIDEO_MADE_FOR_KIDS_NOT_MFK") 
+            # Scroll to audience section if needed and select "No, it's not made for kids"
+            print("Setting audience...")
+            not_for_kids_radio = page.locator(
+                "tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK']"
+            )
+            not_for_kids_radio.scroll_into_view_if_needed()
+            not_for_kids_radio.click()
 
             # Click Next until we reach Visibility
             # Logic: find 'Next' button, click, wait for animation
+            # YouTube Studio has multiple tabs: Details -> Video elements -> Checks -> Visibility
             for i in range(3):
+                print(f"Clicking Next ({i + 1}/3)...")
                 page.click("#next-button")
-                time.sleep(2) # primitive wait
-            
-            # Visibility: Public
-            page.click("name=PUBLIC")
-            
+                time.sleep(2)
+
+            # 5. Visibility: Public
+            print("Setting visibility to Public...")
+            public_radio = page.locator("tp-yt-paper-radio-button[name='PUBLIC']")
+            public_radio.scroll_into_view_if_needed()
+            public_radio.click()
+
             # Publish
-            page.click("#done-button")
-            
-            # Wait for "Video published" or "Processing" dialog
-            page.wait_for_selector("ytcp-video-uploaded-dialog", timeout=60000)
+            print("Publishing...")
+            publish_button = page.locator("#done-button")
+            publish_button.click()
+
             print("Upload completed!")
-            
+
             # 5. Save cookies if successful usage? (Optional)
             if cookies_path:
                 context.storage_state(path=cookies_path)
-                
+
         except Exception as e:
             print(f"Error during upload: {e}")
             page.screenshot(path="error_upload.png")

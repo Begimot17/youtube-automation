@@ -18,7 +18,7 @@ services:
       - ./auth:/app/auth         # Important: Mount cookies from host
       - ./config:/app/config     # Share config
       # - ./src:/app/src         # Optional: Live reload for dev
-    command: python src/server.py # Or src/scheduler.py
+    command: python main_tiktok_to_youtube.py # Or src/scheduler.py
 
   # N8N Orchestrator
   n8n:

@@ -9,3 +9,5 @@ uvicorn
 openai-whisper
 gspread
 google-auth
+TikTokApi
+yt-dlp

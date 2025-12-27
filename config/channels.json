@@ -1,9 +1,22 @@
 [
     {
         "channel_name": "Test Channel 1",
-        "watch_folder": "input_videos",
+        "watch_folder": "data/input_videos",
         "proxy": "",
         "cookies_path": "auth/cookies_channel1.json",
-        "upload_frequency_per_day": 1
+        "upload_frequency_per_day": 1,
+        "tiktok_sources": [
+            "khaby.lame"
+        ]
+    },
+    {
+        "channel_name": "Test Channel 2",
+        "watch_folder": "data/input_videos_2",
+        "proxy": "",
+        "cookies_path": "auth/cookies_channel2.json",
+        "upload_frequency_per_day": 1,
+        "tiktok_sources": [
+            "khaby.lame"
+        ]
     }
 ]
