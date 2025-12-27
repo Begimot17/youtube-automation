@@ -1,7 +1,7 @@
 import asyncio
 import os
+
 import yt_dlp
-from pathlib import Path
 
 
 class TikTokDownloader:

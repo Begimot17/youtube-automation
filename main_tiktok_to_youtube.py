@@ -1,7 +1,7 @@
+import asyncio
 import json
 import os
-import asyncio
-import time
+
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import upload_video_via_browser
 

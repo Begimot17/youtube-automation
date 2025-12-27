@@ -1,12 +1,12 @@
+
 from moviepy.editor import (
-    VideoFileClip,
     AudioFileClip,
-    TextClip,
     ColorClip,
     CompositeVideoClip,
+    TextClip,
+    VideoFileClip,
     concatenate_videoclips,
 )
-import os
 
 
 class VideoRenderer:
@@ -49,8 +49,8 @@ class VideoRenderer:
             print("Rendering without text.")
 
 
+
 from moviepy.editor import *
-import os
 
 
 class VideoRenderer:

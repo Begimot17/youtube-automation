@@ -1,7 +1,8 @@
 import os
-import requests
 import random
 from pathlib import Path
+
+import requests
 
 # Headers for Pexels API
 # Get key from: https://www.pexels.com/api/

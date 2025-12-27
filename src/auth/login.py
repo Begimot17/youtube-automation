@@ -1,6 +1,7 @@
 import argparse
-from playwright.sync_api import sync_playwright
 import os
+
+from playwright.sync_api import sync_playwright
 
 
 def login_and_save_cookies(output_path, cdp_url=None):

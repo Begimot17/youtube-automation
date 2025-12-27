@@ -1,6 +1,7 @@
 import os
 import time
-from src.gen import script_generator, tts, visuals, subtitles
+
+from src.gen import script_generator, subtitles, tts, visuals
 from src.rendering.engine import VideoRenderer
 
 
@@ -71,6 +72,7 @@ def create_content(topic, channel_name="TestChannel"):
 
 if __name__ == "__main__":
     import argparse
+
     from dotenv import load_dotenv
 
     load_dotenv()
