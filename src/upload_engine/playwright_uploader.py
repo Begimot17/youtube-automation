@@ -49,10 +49,6 @@ def upload_video_via_browser(
         else:
             logger.warning("No cookies found. Automation might fail if not logged in.")
 
-        if proxy:
-            # context_options["proxy"] = {"server": proxy} # need robust parsing
-            pass
-
         context = browser.new_context(**context_options)
         page = context.new_page()
 
@@ -60,18 +56,38 @@ def upload_video_via_browser(
             # 1. Go to upload page
             logger.info("Navigating to YouTube upload page...")
             page.goto("https://www.youtube.com/upload", timeout=90000)
-            logger.info(f"Current URL: {page.url}")
 
             # Check if login is needed
             if "accounts.google.com" in page.url:
-                logger.error("Login required. Cookies might be invalid.")
-                # For MVP, we stop here or ask user to login manually and save cookies
-                # Creating a 'pause' here for manual intervention if not headless could be an option
-                if not headless:
-                    logger.info("Please log in manually in the opened window...")
-                    page.pause()
+                logger.info("Login required. Attempting automatic login...")
+                gmail = metadata.get("gmail")
+                password = metadata.get("password")
+
+                if not gmail or not password:
+                    if not headless:
+                        logger.info("Credentials missing. Please log in manually...")
+                        page.pause()
+                    else:
+                        raise Exception(
+                            "Login required but no credentials provided (headless)."
+                        )
                 else:
-                    raise Exception("Login required but running headless.")
+                    # Perform login
+                    logger.info(f"Logging in as {gmail}...")
+                    page.fill('input[type="email"]', gmail)
+                    page.click("#identifierNext")
+                    page.wait_for_selector('input[type="password"]', timeout=30000)
+                    page.fill('input[type="password"]', password)
+                    page.click("#passwordNext")
+
+                    # Wait for redirection to upload/studio
+                    page.wait_for_url("**/upload**", timeout=60000)
+                    logger.info("Login successful.")
+
+                    # Save new cookies
+                    if cookies_path:
+                        context.storage_state(path=cookies_path)
+                        logger.info(f"New cookies saved to {cookies_path}")
 
             # 2. Select file
             logger.info("Selecting file...")

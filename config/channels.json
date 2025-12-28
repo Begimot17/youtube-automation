@@ -1,12 +1,50 @@
 [
     {
         "channel_name": "Sugarfilip75",
+        "mode": "tiktok",
+        "gmail": "your-email@gmail.com",
+        "password": "your-password",
         "watch_folder": "data/Sugarfilip75",
         "proxy": "",
         "cookies_path": "auth/Sugarfilip75.json",
-        "upload_frequency_per_day": 1,
+        "upload_frequency_per_day": 2,
+        "min_delay_seconds": 3600,
         "tiktok_sources": [
             "khaby.lame"
+        ]
+    },
+    {
+        "channel_name": "GenAI_Facts_RU",
+        "mode": "genai",
+        "gmail": "your-email-ru@gmail.com",
+        "password": "your-password-ru",
+        "watch_folder": "data/GenAI_Facts_RU",
+        "proxy": "",
+        "cookies_path": "auth/GenAI_Facts_RU.json",
+        "upload_frequency_per_day": 1,
+        "min_delay_seconds": 7200,
+        "lang": "ru",
+        "genai_topics": [
+            "Самые быстрые животные в мире",
+            "Загадки глубокого космоса",
+            "Неизвестные факты об океане"
+        ]
+    },
+    {
+        "channel_name": "GenAI_Facts_EN",
+        "mode": "genai",
+        "gmail": "your-email-en@gmail.com",
+        "password": "your-password-en",
+        "watch_folder": "data/GenAI_Facts_EN",
+        "proxy": "",
+        "cookies_path": "auth/GenAI_Facts_EN.json",
+        "upload_frequency_per_day": 1,
+        "min_delay_seconds": 7200,
+        "lang": "en",
+        "genai_topics": [
+            "Future of AI technology",
+            "Life on Mars possibility",
+            "Hidden wonders of ancient Egypt"
         ]
     }
 ]
