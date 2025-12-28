@@ -1,5 +1,5 @@
 {
-    "name": "YouTube Automation Control",
+    "name": "YouTube Automation Control (Full)",
     "nodes": [
         {
             "parameters": {
@@ -47,6 +47,101 @@
             "typeVersion": 4.1,
             "position": [
                 700,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://server:5000/logs",
+                "options": {}
+            },
+            "id": "f953e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Get Logs",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                900,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://server:5000/cleanup",
+                "options": {}
+            },
+            "id": "a123e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Disk Cleanup",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://server:5000/status",
+                "options": {}
+            },
+            "id": "b234e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Get Engine Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://server:5000/channels",
+                "options": {}
+            },
+            "id": "c345e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "List Channels",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1100,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://server:5000/disk",
+                "options": {}
+            },
+            "id": "d456e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Disk Usage Stats",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://server:5000/notify",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "message",
+                            "value": "Test notification from n8n!"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "e567e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Send Custom Notification",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1300,
                 500
             ]
         }

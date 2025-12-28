@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create persistent directories
-RUN mkdir -p output auth config data logs
+RUN mkdir -p data/output auth config data/tiktok_downloads logs
 
 # Set Environment variables
 ENV PYTHONUNBUFFERED=1

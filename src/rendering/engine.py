@@ -154,7 +154,6 @@ class VideoRenderer:
         # 2. Visuals
         clips = []
         current_duration = 0
-        visual_index = 0
 
         if not visual_paths:
             logger.warning("No visuals provided. Using black screen.")
@@ -167,16 +166,24 @@ class VideoRenderer:
             )
             current_duration = total_duration
 
-        # Cycle through visuals until we cover the audio duration
-        max_attempts = len(visual_paths) * 2 + 10
+        # Randomize the order of visuals to avoid predictable loops
+        from random import shuffle, uniform
+
+        original_visuals = list(visual_paths)
+        shuffle(original_visuals)
+
+        visual_pool = list(original_visuals)
         attempt_count = 0
+        max_attempts = 100  # Safety break
 
         while current_duration < total_duration and attempt_count < max_attempts:
-            if visual_index >= len(visual_paths):
-                visual_index = 0
+            if not visual_pool:
+                # If we run out, reshuffle and start again
+                logger.info("Reshuffling visual pool for reuse.")
+                visual_pool = list(original_visuals)
+                shuffle(visual_pool)
 
-            v_path = os.path.abspath(visual_paths[visual_index]).replace("\\", "/")
-            visual_index += 1
+            v_path = os.path.abspath(visual_pool.pop(0)).replace("\\", "/")
             attempt_count += 1
 
             try:
@@ -196,19 +203,31 @@ class VideoRenderer:
                     height=self.height,
                 )
 
-                # Each visual plays for ~4s
-                clip_duration = min(clip.duration, 4.0)
-                if clip_duration < 1.0:
-                    clip_duration = clip.duration
+                # SMARTER SEGMENT SELECTION:
+                # Instead of always taking the first 4s, take a random segment
+                # Each visual plays for 3-5 seconds
+                target_clip_dur = uniform(3.0, 5.0)
 
+                # If clip is longer than target, pick a random start point
+                start_t = 0
+                if clip.duration > target_clip_dur + 1.0:
+                    start_t = uniform(0, clip.duration - target_clip_dur)
+
+                clip_duration = min(clip.duration - start_t, target_clip_dur)
+
+                # Final check against remaining audio
                 remaining_audio = total_duration - current_duration
                 if remaining_audio < clip_duration:
                     clip_duration = remaining_audio
 
-                if clip_duration > 0:
-                    clip = clip.subclip(0, clip_duration).set_duration(clip_duration)
+                if clip_duration > 0.5:  # Only add if significant
+                    clip = clip.subclip(start_t, start_t + clip_duration).set_duration(
+                        clip_duration
+                    )
                     clips.append(clip)
                     current_duration += clip_duration
+
+                clip.close()
 
             except Exception as e:
                 logger.error(f"Error loading clip {v_path}: {e}")

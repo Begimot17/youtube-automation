@@ -12,14 +12,18 @@ from src.rendering.engine import VideoRenderer
 logger = logging.getLogger(__name__)
 
 
-def create_content(topic, channel_name="TestChannel", language="ru", quality="easy"):
+def create_content(
+    topic, channel_name="TestChannel", language="ru", quality="easy", voice=None
+):
     """
     Full pipeline to create a video from a topic.
     """
-    logger.info(f"Starting content creation for: {topic} (Lang: {language})")
+    logger.info(
+        f"Starting content creation for: {topic} (Lang: {language}, Quality: {quality}, Voice: {voice})"
+    )
 
     # Paths
-    base_dir = f"output/{channel_name}/{int(time.time())}"
+    base_dir = f"data/output/{channel_name}/{int(time.time())}"
     os.makedirs(base_dir, exist_ok=True)
 
     audio_path = os.path.join(base_dir, "voiceover.mp3")
@@ -37,7 +41,7 @@ def create_content(topic, channel_name="TestChannel", language="ru", quality="ea
 
     # 2. Audio
     logger.info("Step 2: Generating Audio")
-    if not tts.generate_voiceover(script_text, audio_path, language=language):
+    if not tts.generate_voiceover(script_text, audio_path, lang=language, voice=voice):
         logger.error("Failed to generate voiceover.")
         return None
 
@@ -48,25 +52,35 @@ def create_content(topic, channel_name="TestChannel", language="ru", quality="ea
     # 4. Visuals
     logger.info("Step 4: Fetching Visuals")
     visual_paths = []
+    used_visual_urls = set()
     scenes = script_data.get("scenes", [])
+
+    # Track downloaded clips to ensure we don't repeat the same clip too often
     for i, scene in enumerate(scenes):
-        keywords = scene.get("keywords", [])
-        if not keywords:
-            keywords = [topic]
+        scene_keywords = scene.get("keywords", [])
+        if not scene_keywords:
+            scene_keywords = [topic]
 
-        # Try first keyword
-        query = keywords[0]
-        v_path = os.path.join(base_dir, f"scene_{i}.mp4")
+        # Fetch up to 2 unique visuals per scene to ensure variety
+        for k in range(min(len(scene_keywords), 2)):
+            query = scene_keywords[k]
+            v_path = os.path.join(base_dir, f"scene_{i}_v{k}.mp4")
 
-        downloaded = visuals.get_stock_footage(query, v_path)
-        if downloaded:
-            visual_paths.append(downloaded)
-        else:
-            logger.warning(f"Could not download visual for {query}")
+            downloaded, video_url = visuals.get_stock_footage(
+                query, v_path, used_urls=used_visual_urls
+            )
+            if downloaded:
+                visual_paths.append(downloaded)
+                used_visual_urls.add(video_url)
+                logger.info(f"Downloaded unique visual for: {query}")
+                # We stop at 1 if it's broad enough, but for complex topics we take 2
+                if k >= 0:  # Change to 1 if you want exactly 2 per scene
+                    break
+            else:
+                logger.warning(f"Could not download visual for {query}")
 
     if not visual_paths:
         logger.error("No visuals downloaded.")
-        # Fallback to black screen is handled in renderer
 
     # 5. Assemble
     logger.info("Step 5: Assembling Video")
@@ -95,19 +109,18 @@ if __name__ == "__main__":
         "--topic", type=str, default="DefaultTopic", help="Topic for the video script"
     )
     parser.add_argument(
-        "--channel",
-        type=str,
-        default="DefaultChannel",
-        help="Target channel name (for folder organization)",
+        "--channel", type=str, default="DefaultChannel", help="Target channel name"
     )
     parser.add_argument(
         "--lang",
         type=str,
         default="ru",
         choices=["en", "ru"],
-        help="Language for content (en or ru)",
+        help="Language for content",
     )
+    parser.add_argument("--quality", type=str, default="easy", help="Rendering quality")
+    parser.add_argument("--voice", type=str, default=None, help="TTS voice name")
 
     args = parser.parse_args()
 
-    create_content(args.topic, args.channel, args.lang)
+    create_content(args.topic, args.channel, args.lang, args.quality, args.voice)

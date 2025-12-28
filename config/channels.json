@@ -25,6 +25,7 @@
         "upload_frequency_per_day": 1,
         "min_delay_seconds": 7200,
         "lang": "ru",
+        "voice": "ru-RU-SvetlanaNeural",
         "quality": "easy",
         "genai_topics": [
             "Самые быстрые животные в мире",
@@ -43,6 +44,7 @@
         "upload_frequency_per_day": 1,
         "min_delay_seconds": 7200,
         "lang": "en",
+        "voice": "en-US-GuyNeural",
         "quality": "easy",
         "genai_topics": [
             "Future of AI technology",

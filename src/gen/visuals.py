@@ -3,15 +3,13 @@ import random
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+from src.config import Config
 
 logger = logging.getLogger(__name__)
 
 # Headers for Pexels API
-# Get key from: https://www.pexels.com/api/
-PEXELS_API_KEY = "Nzcx8kjRsvrZzgMpsPD2xq94fDxRvNejB1SapEbTGHlJdYkRgdII4Cjw"
+PEXELS_API_KEY = Config.PEXELS_API_KEY
 
 
 def search_pexels_videos(
@@ -31,7 +29,7 @@ def search_pexels_videos(
         "query": query,
         "orientation": orientation,
         "size": size,
-        "per_page": 5,  # Fetch top 5
+        "per_page": 15,  # Increased for more variety
     }
 
     try:
@@ -76,32 +74,53 @@ def download_video(video_url, output_path):
         return None
 
 
-def get_stock_footage(keyword, output_filename):
+def get_stock_footage(keyword, output_filename, used_urls=None):
     """
     High-level function to find and download a stock video for a keyword.
+    Prevents using duplicate videos via used_urls set.
     """
+    used_urls = used_urls or set()
     logger.info(f"Finding footage for: {keyword}")
     videos = search_pexels_videos(keyword)
 
+    # Fallback 1: Try a simpler version of the keyword if it's multiple words
+    if not videos and " " in keyword:
+        simple_query = keyword.split()[-1]
+        logger.info(f"No results for '{keyword}', trying fallback: {simple_query}")
+        videos = search_pexels_videos(simple_query)
+
+    # Fallback 2: General abstract background
     if not videos:
-        logger.info(f"No videos found for {keyword}, trying fallback...")
+        logger.info(f"No videos found for {keyword}, trying abstract fallback...")
         videos = search_pexels_videos("abstract background")
 
     if videos:
-        # Pick a random one from top 5 to vary content
-        video = random.choice(videos)
+        # Filter out already used videos
+        available_videos = [v for v in videos if v["url"] not in used_urls]
 
-        # Get the best quality link for download (usually HD)
+        if not available_videos:
+            logger.warning("All fetched videos were already used. Re-using one.")
+            available_videos = videos
+
+        # Pick a random one from available results
+        video = random.choice(available_videos)
+
+        # Get the best quality link
         files = video["video_files"]
         if not files:
-            return None
+            return None, None
 
-        # Fallback simpler selection
+        # Prefer HD/FullHD links if possible, else take first
         video_url = files[0]["link"]
+        for f in files:
+            if f.get("width") == 1080 or f.get("height") == 1920:
+                video_url = f["link"]
+                break
 
-        return download_video(video_url, output_filename)
+        path = download_video(video_url, output_filename)
+        return path, video["url"]
 
-    return None
+    return None, None
 
 
 if __name__ == "__main__":

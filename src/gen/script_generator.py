@@ -1,91 +1,63 @@
 import json
 import logging
-import os
 
-# Global client
-_client = None
+from google import genai
+
+from src.config import Config
+
 logger = logging.getLogger(__name__)
 
-# Model ID
-MODEL_ID = "gemini-flash-latest"
-
-
-def get_client():
-    """
-    Lazily initializes the Google GenAI client.
-    """
-    global _client
-    if _client is None:
-        # Assumes GOOGLE_API_KEY or GEMINI_API_KEY is set in environment variables
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            # Try loading dotenv just in case
-            try:
-                from dotenv import load_dotenv
-
-                load_dotenv()
-                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            except ImportError:
-                pass
-
-        if not api_key:
-            raise ValueError(
-                "Missing Gemini API Key. Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable."
-            )
-
-        from google import genai
-
-        _client = genai.Client(api_key=api_key)
-    return _client
-
-
-DEFAULT_PROMPT = """
-Act as a YouTube Shorts expert. Write a script on the topic: "{topic}".
-Language of the script (narration and hook) must be: {language_name}.
-Structure the response STRICTLY as valid JSON with the following keys:
-- "hook": A catchy opening sentence (max 5 seconds).
-- "script": The main narration text (approx 45-50 seconds).
-- "scenes": A list of objects, each containing:
-    - "visual_prompt": Description of the image/video to show.
-    - "duration": Approx duration in seconds (3-5s).
-    - "keywords": List of keywords to search for stock footage.
-- "hashtags": List of relevant hashtags.
-
-Make sure the total duration is under 60 seconds.
-"""
+# Initialize Gemini Client
+GEMINI_API_KEY = Config.GOOGLE_API_KEY
 
 
 def generate_script(topic, language="ru"):
     """
-    Generates a YouTube Shorts script for the given topic using Gemini.
+    Generate a short video script using Google's Gemini 1.5 Flash.
     """
-    logger.info(f"Generating script for topic: {topic} (Lang: {language})...")
-
-    language_name = "Russian" if language == "ru" else "English"
+    if not GEMINI_API_KEY:
+        logger.error("GOOGLE_API_KEY not found.")
+        return None
 
     try:
-        client = get_client()
-        prompt = DEFAULT_PROMPT.format(topic=topic, language_name=language_name)
+        client = genai.Client(api_key=GEMINI_API_KEY)
+
+        prompt = f"""
+        Create a high-quality script for a YouTube Short video (under 60 seconds) about: {topic}.
+        The language of the spoken script MUST be: {language}.
+        
+        The output MUST be a JSON object with two fields:
+        1. "script": a string containing the punchy, engaging text to be spoken.
+        2. "scenes": a list of objects (at least 15-20 scenes for variety), each containing:
+           - "text": a small snippet (1-2 sentences) of the script for this scene.
+           - "keywords": a list of 2-4 HIGHLY DESCRIPTIVE English keywords to search for specific, relevant stock footage (e.g., ["close up of space star nebula", "telescope lens looking at space", "cinematic galaxy animation"]). 
+           Avoid generic keywords like "man" or "business". Be specific and varied.
+
+        Make sure the keywords are in English regardless of the output language.
+        """
+
         response = client.models.generate_content(
-            model=MODEL_ID,
+            model="gemini-1.5-flash",
             contents=prompt,
-            config={"response_mime_type": "application/json"},
         )
 
-        content = response.text
-        script_data = json.loads(content)
-        return script_data
+        if not response.text:
+            logger.error("Gemini returned empty text.")
+            return None
+
+        # Parse JSON from response
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+
+        logger.info(f"Generated script for topic: {topic}")
+        return data
 
     except Exception as e:
-        logger.error(f"Error generating script: {e}")
+        logger.error(f"Error generating script with Gemini: {e}")
         return None
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
-    test_topic = "Top 3 Space Facts"
-    result = generate_script(test_topic, language="en")
-    print(json.dumps(result, indent=2))
+    # Test
+    res = generate_script("Interesting fact about space", language="en")
+    print(res)

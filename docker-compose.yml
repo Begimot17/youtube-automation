@@ -1,26 +1,61 @@
 version: '3.8'
 
 services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: youtube_auto_db
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=automation
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=user_password
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
   # The Python Automation Server
   server:
     build: .
     image: youtube-automation:latest
     container_name: youtube_auto_server
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    depends_on:
+      - db
     environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - PYTHONPATH=/app
+    ports:
+      - "${PORT:-5000}:5000"
+    env_file:
+      - .env
     volumes:
-      - ./output:/app/output
       - ./auth:/app/auth
       - ./config:/app/config
       - ./data:/app/data
       - ./logs:/app/logs
-    # Keep standard STDIN open for interactive login if needed
     stdin_open: true
     tty: true
+
+  # Telegram Bot Controller
+  bot:
+    build: .
+    image: youtube-automation:latest
+    container_name: youtube_auto_bot
+    restart: unless-stopped
+    depends_on:
+      - server
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+    command: ["python", "src/telegram_bot.py"]
+    volumes:
+      - ./auth:/app/auth
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./logs:/app/logs
 
   # N8N Orchestrator
   n8n:
@@ -37,4 +72,5 @@ services:
       - n8n_data:/home/node/.n8n
 
 volumes:
+  db_data:
   n8n_data:
