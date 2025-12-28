@@ -222,11 +222,18 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Triggers custom video generation."""
     if not context.args:
-        await update.message.reply_text('Usage: /generate "Topic" [en|ru]')
+        await update.message.reply_text('Usage: /generate <Topic> [en|ru]')
         return
 
-    topic = context.args[0]
-    lang = context.args[1] if len(context.args) > 1 else "ru"
+    args = context.args
+    lang = "ru"
+    topic_words = args
+
+    if len(args) > 1 and args[-1].lower() in ["en", "ru"]:
+        lang = args[-1].lower()
+        topic_words = args[:-1]
+
+    topic = " ".join(topic_words)
 
     try:
         response = requests.post(
