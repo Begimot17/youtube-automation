@@ -1,10 +1,13 @@
 # Use official Playwright image (includes Python & Browsers)
 FROM mcr.microsoft.com/playwright/python:v1.57.0-jammy
 
-# Install system dependencies for MoviePy & Audio
+# Install system dependencies for MoviePy, Audio, and Xvfb
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     fonts-liberation \
+    xvfb \
+    x11-utils \
+    x11-xserver-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -25,6 +28,7 @@ RUN mkdir -p data/output auth config data/tiktok_downloads logs
 # Set Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=5000
+ENV DISPLAY=:99
 
 # Copy and set entrypoint
 COPY docker-entrypoint.sh /docker-entrypoint.sh
