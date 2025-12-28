@@ -72,7 +72,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output",
-        default="auth/cookies_channel1.json",
+        default="auth/Sugarfilip75.json",
         help="Path to save cookies.json",
     )
     parser.add_argument(

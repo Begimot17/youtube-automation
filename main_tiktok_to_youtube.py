@@ -3,9 +3,14 @@ import json
 import logging
 import os
 
+from dotenv import load_dotenv
+
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import upload_video_via_browser
 from src.utils.logging_config import setup_logging
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 setup_logging()

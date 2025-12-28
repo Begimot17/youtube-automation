@@ -6,10 +6,13 @@ from pathlib import Path
 import requests
 
 logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Headers for Pexels API
 # Get key from: https://www.pexels.com/api/
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
+PEXELS_API_KEY = "Nzcx8kjRsvrZzgMpsPD2xq94fDxRvNejB1SapEbTGHlJdYkRgdII4Cjw"
 
 
 def search_pexels_videos(

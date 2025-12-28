@@ -1,6 +1,10 @@
 import logging
 import os
+import sys
 import time
+
+# Add project root to sys.path to support 'from src...' imports when run directly
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.gen import script_generator, subtitles, tts, visuals
 from src.rendering.engine import VideoRenderer
@@ -8,32 +12,34 @@ from src.rendering.engine import VideoRenderer
 logger = logging.getLogger(__name__)
 
 
-def create_content(topic, channel_name="TestChannel"):
+def create_content(topic, channel_name="TestChannel", language="ru"):
     """
     Full pipeline to create a video from a topic.
     """
-    logger.info(f"Starting content creation for: {topic}")
+    logger.info(f"Starting content creation for: {topic} (Lang: {language})")
 
     # Paths
     base_dir = f"output/{channel_name}/{int(time.time())}"
     os.makedirs(base_dir, exist_ok=True)
 
-    audio_path = f"{base_dir}/voiceover.mp3"
-    video_output = f"{base_dir}/final.mp4"
+    audio_path = os.path.join(base_dir, "voiceover.mp3")
+    video_output = os.path.join(base_dir, "final.mp4")
 
     # 1. Script
     logger.info("Step 1: generating Script")
-    script_data = script_generator.generate_script(topic)
+    script_data = script_generator.generate_script(topic, language=language)
     if not script_data:
-        return
+        logger.error("Failed to generate script.")
+        return None
 
     script_text = script_data.get("script", "")
     logger.info(f"Script length: {len(script_text)} chars")
 
     # 2. Audio
     logger.info("Step 2: Generating Audio")
-    if not tts.generate_voiceover(script_text, audio_path):
-        return
+    if not tts.generate_voiceover(script_text, audio_path, language=language):
+        logger.error("Failed to generate voiceover.")
+        return None
 
     # 3. Subtitles
     logger.info("Step 3: Generating Subtitles")
@@ -50,7 +56,7 @@ def create_content(topic, channel_name="TestChannel"):
 
         # Try first keyword
         query = keywords[0]
-        v_path = f"{base_dir}/scene_{i}.mp4"
+        v_path = os.path.join(base_dir, f"scene_{i}.mp4")
 
         downloaded = visuals.get_stock_footage(query, v_path)
         if downloaded:
@@ -60,7 +66,7 @@ def create_content(topic, channel_name="TestChannel"):
 
     if not visual_paths:
         logger.error("No visuals downloaded.")
-        return
+        # Fallback to black screen is handled in renderer
 
     # 5. Assemble
     logger.info("Step 5: Assembling Video")
@@ -75,14 +81,13 @@ def create_content(topic, channel_name="TestChannel"):
 
 if __name__ == "__main__":
     import argparse
-
     from dotenv import load_dotenv
 
     load_dotenv()
 
     parser = argparse.ArgumentParser(description="Generate YouTube Short from Topic")
     parser.add_argument(
-        "--topic", type=str, required=True, help="Topic for the video script"
+        "--topic", type=str, default="DefaultTopic", help="Topic for the video script"
     )
     parser.add_argument(
         "--channel",
@@ -90,7 +95,14 @@ if __name__ == "__main__":
         default="DefaultChannel",
         help="Target channel name (for folder organization)",
     )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        default="ru",
+        choices=["en", "ru"],
+        help="Language for content (en or ru)",
+    )
 
     args = parser.parse_args()
 
-    create_content(args.topic, args.channel)
+    create_content(args.topic, args.channel, args.lang)

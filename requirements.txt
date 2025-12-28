@@ -11,3 +11,6 @@ gspread
 google-auth
 TikTokApi
 yt-dlp
+google-genai
+edge-tts
+nest-asyncio

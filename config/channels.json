@@ -1,19 +1,9 @@
 [
     {
-        "channel_name": "Test Channel 1",
-        "watch_folder": "data/input_videos",
+        "channel_name": "Sugarfilip75",
+        "watch_folder": "data/Sugarfilip75",
         "proxy": "",
-        "cookies_path": "auth/cookies_channel1.json",
-        "upload_frequency_per_day": 1,
-        "tiktok_sources": [
-            "khaby.lame"
-        ]
-    },
-    {
-        "channel_name": "Test Channel 2",
-        "watch_folder": "data/input_videos_2",
-        "proxy": "",
-        "cookies_path": "auth/cookies_channel2.json",
+        "cookies_path": "auth/Sugarfilip75.json",
         "upload_frequency_per_day": 1,
         "tiktok_sources": [
             "khaby.lame"
