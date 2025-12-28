@@ -1,14 +1,13 @@
 import logging
-import os
 import random
 from pathlib import Path
 
 import requests
-
-logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Headers for Pexels API
 # Get key from: https://www.pexels.com/api/
@@ -94,8 +93,8 @@ def get_stock_footage(keyword, output_filename):
 
         # Get the best quality link for download (usually HD)
         files = video["video_files"]
-        # valid_files = [f for f in files if f['width'] and f['width'] >= 720]
-        # video_url = valid_files[0]['link'] if valid_files else files[0]['link']
+        if not files:
+            return None
 
         # Fallback simpler selection
         video_url = files[0]["link"]
@@ -106,9 +105,5 @@ def get_stock_footage(keyword, output_filename):
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
     # Test
     get_stock_footage("space galaxy", "assets/space_test.mp4")

@@ -1,12 +1,10 @@
 import logging
 import os
-import sys
-from pathlib import Path
 
+import numpy as np
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
-import numpy as np
 
 # Monkeypatch for PIL.Image.ANTIALIAS (removed in Pillow 10.0.0)
 if not hasattr(PIL.Image, "ANTIALIAS"):

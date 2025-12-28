@@ -1,7 +1,8 @@
 import logging
 import os
-import time
 import threading
+import time
+
 from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)

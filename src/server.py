@@ -1,10 +1,11 @@
+import asyncio
 import logging
-import json
 import os
 import threading
-import asyncio
-from flask import Flask, jsonify, request
-from main import run_full_cycle, run_for_channel, load_config, load_history
+
+from flask import Flask, jsonify
+
+from main import load_config, load_history, run_for_channel, run_full_cycle
 
 app = Flask(__name__)
 logger = logging.getLogger("server")

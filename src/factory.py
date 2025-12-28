@@ -85,6 +85,7 @@ def create_content(topic, channel_name="TestChannel", language="ru", quality="ea
 
 if __name__ == "__main__":
     import argparse
+
     from dotenv import load_dotenv
 
     load_dotenv()

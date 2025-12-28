@@ -2,18 +2,18 @@ import asyncio
 import json
 import logging
 import os
-import time
 import random
+import time
 
 from dotenv import load_dotenv
 
+from src.factory import create_content
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import (
     upload_video_via_browser,
     verify_login_status,
 )
 from src.utils.logging_config import setup_logging
-from src.factory import create_content
 
 # Load environment variables
 load_dotenv()
@@ -265,7 +265,6 @@ async def run_for_channel(channel_name):
 
 async def main_loop():
     logger.info("Starting Automation Engine (Loop mode)...")
-    downloader = TikTokDownloader()
     while True:
         try:
             await run_full_cycle()
