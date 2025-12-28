@@ -29,19 +29,16 @@ def input_with_timeout(prompt, timeout):
     return result[0]
 
 
-def verify_login_status(gmail, password, cookies_path, proxy=None, headless=True):
+def verify_login_status(gmail, password, cookies_path, proxy=None, headless=False):
     """
     Checks if we are logged into YouTube. If not, attempts automatic login.
     If it requires manual intervention (2FA, etc), opens browser and asks user.
     """
     logger.info(f"Verifying login status for {gmail}...")
 
-    # We force headless=False for manual verification if we can't find cookies or session is dead
-    actual_headless = headless
-
     with sync_playwright() as p:
         browser_args = ["--disable-blink-features=AutomationControlled"]
-        browser = p.chromium.launch(headless=actual_headless, args=browser_args)
+        browser = p.chromium.launch(headless=headless, args=browser_args)
 
         context_options = {
             "viewport": {"width": 1280, "height": 720},
@@ -60,7 +57,7 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=True
                 logger.info("Session expired. Auto-login initiated...")
 
                 # If we were headless, we might need a visible browser for 2FA/Manual help
-                if actual_headless:
+                if headless:
                     browser.close()
                     browser = p.chromium.launch(headless=False, args=browser_args)
                     context = browser.new_context(**context_options)
@@ -105,6 +102,9 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=True
             logger.error(f"Login verification error: {e}")
             return False
         finally:
+            if not headless:
+                logger.info("Debug: Pausing for 5s before closing browser...")
+                time.sleep(5)
             browser.close()
 
 
@@ -188,4 +188,7 @@ def upload_video_via_browser(
             logger.error(f"Upload error: {e}")
             raise e
         finally:
+            if not headless:
+                logger.info("Debug: Pausing for 5s before closing browser...")
+                time.sleep(5)
             browser.close()

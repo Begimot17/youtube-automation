@@ -96,7 +96,7 @@ async def process_tiktok_channel(channel, downloader, db):
         gmail=channel.gmail,
         password=channel.password,
         cookies_path=channel.cookies_path,
-        headless=True,
+        headless=False,
     )
     if not is_logged_in:
         msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
@@ -163,7 +163,7 @@ async def process_genai_channel(channel, db):
         gmail=channel.gmail,
         password=channel.password,
         cookies_path=channel.cookies_path,
-        headless=True,
+        headless=False,
     )
     if not is_logged_in:
         msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."

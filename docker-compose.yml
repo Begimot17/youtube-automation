@@ -16,7 +16,7 @@ services:
     ports:
       - "3307:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-puser_password"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-puser_password" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -59,13 +59,12 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["python", "src/telegram_bot.py"]
+    command: [ "python", "src/telegram_bot.py" ]
     volumes:
       - ./auth:/app/auth
       - ./config:/app/config
       - ./data:/app/data
       - ./logs:/app/logs
-
   # N8N Orchestrator
   # n8n:
   #   image: n8nio/n8n:latest
@@ -81,5 +80,4 @@ services:
   #     - n8n_data:/home/node/.n8n
 
 volumes:
-  db_data:
-  # n8n_data:
+  db_data: # n8n_data:

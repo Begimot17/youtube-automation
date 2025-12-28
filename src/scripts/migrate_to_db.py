@@ -64,14 +64,15 @@ def migrate():
                         .first()
                     )
                     if channel:
-                        for u_data in uploads:
-                            item_id = u_data.get("id")
-                            ts = u_data.get("timestamp", 0)
-                            dt = (
-                                datetime.fromtimestamp(ts)
-                                if ts > 0
-                                else datetime.utcnow()
-                            )
+                        for item_id in uploads:
+                            if not isinstance(item_id, str):
+                                # The old format had a list of strings. If we see something else,
+                                # log it or skip it to be safe.
+                                print(f"Skipping unexpected item in history: {item_id}")
+                                continue
+
+                            # Old format did not have timestamps, so we use now.
+                            dt = datetime.utcnow()
 
                             # Check if history entry exists
                             existing_upload = (

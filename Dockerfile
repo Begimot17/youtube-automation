@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     x11-utils \
     x11-xserver-utils \
+    x11vnc \
+    fluxbox \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
