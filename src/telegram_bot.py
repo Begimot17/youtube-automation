@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 
@@ -118,29 +119,32 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=5)
             if response.status_code == 200:
                 await query.edit_message_text(
-                    f"🚀 <b>{name}</b>: Started successfully!", parse_mode="HTML"
+                    f"🚀 <b>{html.escape(name)}</b>: Started successfully!",
+                    parse_mode="HTML",
                 )
             else:
                 err = response.json().get("error", "Unknown error")
                 await query.edit_message_text(
-                    f"⚠️ <b>{name}</b>: Failed to start ({err})", parse_mode="HTML"
+                    f"⚠️ <b>{html.escape(name)}</b>: Failed to start ({html.escape(err)})",
+                    parse_mode="HTML",
                 )
         except Exception as e:
-            await query.edit_message_text(f"❌ Error: {e}")
+            await query.edit_message_text(f"❌ Error: {html.escape(str(e))}")
 
     elif action == "del":
         try:
             response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=5)
             if response.status_code == 200:
                 await query.edit_message_text(
-                    f"🗑 <b>{name}</b>: Deleted successfully!", parse_mode="HTML"
+                    f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!",
+                    parse_mode="HTML",
                 )
             else:
                 await query.edit_message_text(
-                    f"⚠️ <b>{name}</b>: Failed to delete", parse_mode="HTML"
+                    f"⚠️ <b>{html.escape(name)}</b>: Failed to delete", parse_mode="HTML"
                 )
         except Exception as e:
-            await query.edit_message_text(f"❌ Error: {e}")
+            await query.edit_message_text(f"❌ Error: {html.escape(str(e))}")
 
 
 @restricted
@@ -154,12 +158,16 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=5)
         if response.status_code == 200:
-            await update.message.reply_html(f"🚀 <b>{name}</b>: Started successfully!")
+            await update.message.reply_html(
+                f"🚀 <b>{html.escape(name)}</b>: Started successfully!"
+            )
         else:
             err = response.json().get("error", "Unknown error")
-            await update.message.reply_html(f"⚠️ <b>{name}</b>: {err}")
+            await update.message.reply_html(
+                f"⚠️ <b>{html.escape(name)}</b>: {html.escape(err)}"
+            )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ Error: {html.escape(str(e))}")
 
 
 @restricted
@@ -177,15 +185,15 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         response = requests.post(f"{API_BASE_URL}/channel", json=data, timeout=5)
         if response.status_code == 201:
             await update.message.reply_html(
-                f"✅ <b>{data['channel_name']}</b>: Created successfully!"
+                f"✅ <b>{html.escape(data['channel_name'])}</b>: Created successfully!"
             )
         else:
             err = response.json().get("error", "Unknown error")
-            await update.message.reply_html(f"⚠️ Failed: {err}")
+            await update.message.reply_html(f"⚠️ Failed: {html.escape(err)}")
     except json.JSONDecodeError:
         await update.message.reply_text("❌ Invalid JSON format.")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ Error: {html.escape(str(e))}")
 
 
 @restricted
@@ -199,11 +207,15 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=5)
         if response.status_code == 200:
-            await update.message.reply_html(f"🗑 <b>{name}</b>: Deleted successfully!")
+            await update.message.reply_html(
+                f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!"
+            )
         else:
-            await update.message.reply_html(f"⚠️ Failed to delete <b>{name}</b>.")
+            await update.message.reply_html(
+                f"⚠️ Failed to delete <b>{html.escape(name)}</b>."
+            )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ Error: {html.escape(str(e))}")
 
 
 @restricted
@@ -223,10 +235,12 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=5,
         )
         if response.status_code == 200:
+            safe_topic = html.escape(topic)
+            safe_lang = html.escape(lang)
             await update.message.reply_html(
                 f"🎬 <b>Generation started!</b>\n"
-                f"Topic: <i>{topic}</i>\n"
-                f"Language: <i>{lang}</i>\n\n"
+                f"Topic: <i>{safe_topic}</i>\n"
+                f"Language: <i>{safe_lang}</i>\n\n"
                 f"The video will be sent to you automatically when ready."
             )
         else:

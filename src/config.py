@@ -24,7 +24,7 @@ class Config:
 
     # Database
     # Default for local dev if not in docker
-    DEFAULT_DB = "mysql+mysqlconnector://user:user_password@localhost/automation"
+    DEFAULT_DB = "mysql+mysqlconnector://user:user_password@localhost:3307/automation"
     DATABASE_URL = os.environ.get("DATABASE_URL") or DEFAULT_DB
 
     # Server

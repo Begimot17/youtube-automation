@@ -14,7 +14,12 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-puser_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # The Python Automation Server
   server:
@@ -23,7 +28,8 @@ services:
     container_name: youtube_auto_server
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - PYTHONPATH=/app
     ports:
@@ -45,7 +51,10 @@ services:
     container_name: youtube_auto_bot
     restart: unless-stopped
     depends_on:
-      - server
+      db:
+        condition: service_healthy
+      server:
+        condition: service_started
     env_file:
       - .env
     environment:

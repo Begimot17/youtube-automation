@@ -6,7 +6,7 @@ import os
 _client = None
 logger = logging.getLogger(__name__)
 
-MODEL_ID = "gemini-flash-latest"
+MODEL_ID = "gemini-2.0-flash"
 
 
 def get_client():
