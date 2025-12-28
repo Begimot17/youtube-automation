@@ -1,5 +1,5 @@
 # Use official Playwright image (includes Python & Browsers)
-FROM mcr.microsoft.com/playwright/python:v1.49.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.57.0-jammy
 
 # Install system dependencies for MoviePy & Audio
 RUN apt-get update && apt-get install -y \
