@@ -12,7 +12,7 @@ from src.rendering.engine import VideoRenderer
 logger = logging.getLogger(__name__)
 
 
-def create_content(topic, channel_name="TestChannel", language="ru"):
+def create_content(topic, channel_name="TestChannel", language="ru", quality="easy"):
     """
     Full pipeline to create a video from a topic.
     """
@@ -72,7 +72,11 @@ def create_content(topic, channel_name="TestChannel", language="ru"):
     logger.info("Step 5: Assembling Video")
     renderer = VideoRenderer()
     renderer.assemble_short(
-        audio_path, visual_paths, subtitles=subs, output_path=video_output
+        audio_path,
+        visual_paths,
+        subtitles=subs,
+        output_path=video_output,
+        quality=quality,
     )
 
     logger.info(f"Video created successfully: {video_output}")

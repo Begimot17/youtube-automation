@@ -133,12 +133,21 @@ class VideoRenderer:
             return None
 
     def assemble_short(
-        self, audio_path, visual_paths, subtitles=None, output_path="output.mp4"
+        self,
+        audio_path,
+        visual_paths,
+        subtitles=None,
+        output_path="output.mp4",
+        quality="easy",
     ):
         """
         Assembles the final Shorts video.
         """
         logger.info("Assembling video...")
+
+        # Normalize path for FFMPEG compatibility on Windows
+        output_path = os.path.abspath(output_path).replace("\\", "/")
+        audio_path = os.path.abspath(audio_path).replace("\\", "/")
 
         # 1. Audio
         audio = AudioFileClip(audio_path)
@@ -168,7 +177,7 @@ class VideoRenderer:
             if visual_index >= len(visual_paths):
                 visual_index = 0
 
-            v_path = visual_paths[visual_index]
+            v_path = os.path.abspath(visual_paths[visual_index]).replace("\\", "/")
             visual_index += 1
             attempt_count += 1
 
@@ -263,13 +272,19 @@ class VideoRenderer:
                 final_video = CompositeVideoClip([final_video] + text_clips)
 
         # Write
+        preset = "ultrafast" if quality == "easy" else "medium"
+        logger.info(f"Writing video with preset: {preset}")
+
         final_video.write_videofile(
-            output_path, fps=24, codec="libx264", audio_codec="aac"
+            output_path,
+            fps=24,
+            codec="libx264",
+            audio_codec="aac",
+            preset=preset,
+            threads=4,
         )
         logger.info(f"Video saved to {output_path}")
 
 
 if __name__ == "__main__":
     renderer = VideoRenderer()
-    # Test stub
-    # renderer.assemble_short("voiceover.mp3", ["visual.mp4"])

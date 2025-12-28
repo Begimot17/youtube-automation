@@ -14,3 +14,5 @@ yt-dlp
 google-genai
 edge-tts
 nest-asyncio
+flask
+gunicorn

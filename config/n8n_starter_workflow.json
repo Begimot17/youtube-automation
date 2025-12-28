@@ -1,0 +1,67 @@
+{
+    "name": "YouTube Automation Control",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 6
+                        }
+                    ]
+                }
+            },
+            "id": "c620e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://server:5000/run/all",
+                "options": {}
+            },
+            "id": "d731e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Run All Channels",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://server:5000/stats",
+                "options": {}
+            },
+            "id": "e842e7b5-9b06-4612-b09b-145be64fab0d",
+            "name": "Get Stats",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                700,
+                500
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Run All Channels",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

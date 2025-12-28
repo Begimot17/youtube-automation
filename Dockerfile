@@ -1,15 +1,11 @@
 # Use official Playwright image (includes Python & Browsers)
 FROM mcr.microsoft.com/playwright/python:v1.49.0-jammy
 
-# Install system dependencies for MoviePy (ImageMagick) & Audio
+# Install system dependencies for MoviePy & Audio
 RUN apt-get update && apt-get install -y \
-    imagemagick \
     ffmpeg \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-
-# Fix ImageMagick policy to allow text handling (common MoviePy issue)
-RUN sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
 
 WORKDIR /app
 
@@ -20,12 +16,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY . .
 
-# Create output directories to avoid permission issues
-RUN mkdir -p output auth config
+# Create persistent directories
+RUN mkdir -p output auth config data logs
 
 # Set Environment variables
 ENV PYTHONUNBUFFERED=1
-ENV IMAGEMAGICK_BINARY=/usr/bin/convert
+ENV PORT=5000
 
-# Default command: Run the API Server (can be overridden to scheduler.py)
-CMD ["python", "src/server.py"]
+# Default command: Run the API Server
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--timeout", "0", "--chdir", "src", "server:app"]

@@ -1,10 +1,110 @@
 import logging
 import os
 import time
-
+import threading
 from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
+
+
+def input_with_timeout(prompt, timeout):
+    """
+    Prompts for input with a timeout.
+    """
+    print(prompt, end="", flush=True)
+    result = [None]
+
+    def get_input():
+        result[0] = input().lower().strip()
+
+    thread = threading.Thread(target=get_input)
+    thread.daemon = True
+    thread.start()
+    thread.join(timeout)
+
+    if thread.is_alive():
+        print("\nTimeout reached. Assuming 'n'.")
+        return "n"
+    return result[0]
+
+
+def verify_login_status(gmail, password, cookies_path, proxy=None, headless=True):
+    """
+    Checks if we are logged into YouTube. If not, attempts automatic login.
+    If it requires manual intervention (2FA, etc), opens browser and asks user.
+    """
+    logger.info(f"Verifying login status for {gmail}...")
+
+    # We force headless=False for manual verification if we can't find cookies or session is dead
+    actual_headless = headless
+
+    with sync_playwright() as p:
+        browser_args = ["--disable-blink-features=AutomationControlled"]
+        browser = p.chromium.launch(headless=actual_headless, args=browser_args)
+
+        context_options = {
+            "viewport": {"width": 1280, "height": 720},
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        if cookies_path and os.path.exists(cookies_path):
+            context_options["storage_state"] = cookies_path
+
+        context = browser.new_context(**context_options)
+        page = context.new_page()
+
+        try:
+            page.goto("https://www.youtube.com/upload", timeout=60000)
+
+            if "accounts.google.com" in page.url:
+                logger.info("Session expired. Auto-login initiated...")
+
+                # If we were headless, we might need a visible browser for 2FA/Manual help
+                if actual_headless:
+                    browser.close()
+                    browser = p.chromium.launch(headless=False, args=browser_args)
+                    context = browser.new_context(**context_options)
+                    page = context.new_page()
+                    page.goto("https://www.youtube.com/upload", timeout=60000)
+
+                if gmail and password:
+                    try:
+                        page.fill('input[type="email"]', gmail)
+                        page.click("#identifierNext")
+                        page.wait_for_selector('input[type="password"]', timeout=15000)
+                        page.fill('input[type="password"]', password)
+                        page.click("#passwordNext")
+                    except Exception:
+                        logger.warning(
+                            "Auto-fill failed or 2FA required. Please finish login manually."
+                        )
+
+                # Interactive prompt
+                msg = f"\n[AUTO] Проверьте окно браузера и выполните вход для {gmail}.\nПолучилось залогиниться? (y/n) [Ожидание 5 мин]: "
+                choice = input_with_timeout(msg, 300)
+
+                if choice == "y":
+                    try:
+                        page.wait_for_url("**/upload**", timeout=10000)
+                        logger.info("Login confirmed by user.")
+                        if cookies_path:
+                            context.storage_state(path=cookies_path)
+                            logger.info(f"Saved fresh cookies to {cookies_path}")
+                        return True
+                    except Exception:
+                        logger.error("User said 'y' but we are not on the upload page.")
+                        return False
+                else:
+                    logger.warning(f"Login for {gmail} rejected or timed out.")
+                    return False
+
+            logger.info("Session active (Verified).")
+            return True
+
+        except Exception as e:
+            logger.error(f"Login verification error: {e}")
+            return False
+        finally:
+            browser.close()
 
 
 def upload_video_via_browser(
@@ -12,82 +112,40 @@ def upload_video_via_browser(
 ):
     """
     Uploads a video to YouTube using Playwright.
-
-    Args:
-        video_path (str): Absolute path to the video file.
-        metadata (dict): Dictionary containing 'title', 'description', etc.
-        proxy (str): Proxy string (e.g., "http://user:pass@ip:port") or None.
-        cookies_path (str): Path to the JSON cookies file or None.
-        headless (bool): Whether to run in headless mode.
     """
-    logger.info(f"Starting upload for: {video_path}")
-
-    if proxy:
-        # Initial primitive parsing for proxy, usually expected as dictionary by Playwright
-        # For simplicity, assuming the user provides it in a format Playwright accepts or handles split manually
-        # This is a placeholder for robust proxy parsing
-        pass
+    logger.info(f"Uploading: {video_path}")
 
     with sync_playwright() as p:
-        # Standard stealth arguments
-        browser_args = [
-            "--disable-blink-features=AutomationControlled",
-        ]
-
-        # Launch browser
-        logger.info(f"Launching browser (headless={headless})...")
+        browser_args = ["--disable-blink-features=AutomationControlled"]
         browser = p.chromium.launch(headless=headless, args=browser_args, slow_mo=500)
 
-        # Create context with storage state (cookies) if available
         context_options = {
             "viewport": {"width": 1280, "height": 720},
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
         if cookies_path and os.path.exists(cookies_path):
             context_options["storage_state"] = cookies_path
-            logger.info(f"Loaded cookies from {cookies_path}")
-        else:
-            logger.warning("No cookies found. Automation might fail if not logged in.")
 
         context = browser.new_context(**context_options)
         page = context.new_page()
 
         try:
-            # 1. Go to upload page
-            logger.info("Navigating to YouTube upload page...")
             page.goto("https://www.youtube.com/upload", timeout=90000)
 
-            # Check if login is needed
+            # Re-check login just in case, though main should handle it
             if "accounts.google.com" in page.url:
-                logger.info("Login required. Attempting automatic login...")
+                logger.info("Session lost. Attempting quick login...")
                 gmail = metadata.get("gmail")
                 password = metadata.get("password")
-
-                if not gmail or not password:
-                    if not headless:
-                        logger.info("Credentials missing. Please log in manually...")
-                        page.pause()
-                    else:
-                        raise Exception(
-                            "Login required but no credentials provided (headless)."
-                        )
-                else:
-                    # Perform login
-                    logger.info(f"Logging in as {gmail}...")
+                if gmail and password:
                     page.fill('input[type="email"]', gmail)
                     page.click("#identifierNext")
                     page.wait_for_selector('input[type="password"]', timeout=30000)
                     page.fill('input[type="password"]', password)
                     page.click("#passwordNext")
-
-                    # Wait for redirection to upload/studio
                     page.wait_for_url("**/upload**", timeout=60000)
-                    logger.info("Login successful.")
-
-                    # Save new cookies
                     if cookies_path:
                         context.storage_state(path=cookies_path)
-                        logger.info(f"New cookies saved to {cookies_path}")
 
             # 2. Select file
             logger.info("Selecting file...")
@@ -97,21 +155,14 @@ def upload_video_via_browser(
             file_chooser = fc_info.value
             file_chooser.set_files(video_path)
 
-            # 3. Wait for upload to start and metadata form to appear
-            logger.info("Waiting for upload interface...")
-            # Use more robust selectors that are language-independent
+            logger.info("Filling metadata...")
             title_input = page.locator("#title-textarea #textbox")
             title_input.wait_for(timeout=60000)
-
-            # 4. Fill Metadata
-            logger.info("Filling metadata...")
             title_input.fill(metadata.get("title", "New Video"))
 
-            # Description
             desc_input = page.locator("#description-textarea #textbox")
             desc_input.fill(metadata.get("description", "Uploaded via automation"))
 
-            # Scroll to audience section if needed and select "No, it's not made for kids"
             logger.info("Setting audience...")
             not_for_kids_radio = page.locator(
                 "tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK']"
@@ -119,37 +170,21 @@ def upload_video_via_browser(
             not_for_kids_radio.scroll_into_view_if_needed()
             not_for_kids_radio.click()
 
-            # Click Next until we reach Visibility
-            for i in range(3):
-                logger.info(f"Clicking Next ({i + 1}/3)...")
+            for _ in range(3):
                 page.click("#next-button")
                 time.sleep(2)
 
-            # 5. Visibility: Public
-            logger.info("Setting visibility to Public...")
+            logger.info("Publishing as Public...")
             public_radio = page.locator("tp-yt-paper-radio-button[name='PUBLIC']")
             public_radio.scroll_into_view_if_needed()
             public_radio.click()
 
-            # Publish
-            logger.info("Publishing...")
-            publish_button = page.locator("#done-button")
-            publish_button.click()
-
+            page.click("#done-button")
+            time.sleep(10)
             logger.info("Upload completed!")
 
-            # 5. Save cookies if successful usage? (Optional)
-            if cookies_path:
-                context.storage_state(path=cookies_path)
-
         except Exception as e:
-            logger.error(f"Error during upload: {e}")
-            try:
-                if not page.is_closed():
-                    page.screenshot(path="error_upload.png")
-            except Exception:
-                pass
+            logger.error(f"Upload error: {e}")
             raise e
         finally:
-            logger.info("Closing browser...")
             browser.close()

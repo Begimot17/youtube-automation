@@ -4,12 +4,14 @@ import logging
 import os
 import time
 import random
-from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
 from src.sources.tiktok_downloader import TikTokDownloader
-from src.upload_engine.playwright_uploader import upload_video_via_browser
+from src.upload_engine.playwright_uploader import (
+    upload_video_via_browser,
+    verify_login_status,
+)
 from src.utils.logging_config import setup_logging
 from src.factory import create_content
 
@@ -33,20 +35,11 @@ def load_config():
 
 
 def load_history():
-    """
-    History structure:
-    {
-        "channel_name": [
-            {"id": "video123", "timestamp": 1700000000},
-            ...
-        ]
-    }
-    """
     if os.path.exists(HISTORY_PATH):
         try:
             with open(HISTORY_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Migration check: if values are list of strings, convert to list of dicts
+                # Migration check
                 for channel in data:
                     if data[channel] and isinstance(data[channel][0], str):
                         data[channel] = [
@@ -93,7 +86,6 @@ def can_upload(channel, history):
     freq = channel.get("upload_frequency_per_day", 1)
     min_delay = channel.get("min_delay_seconds", 3600)
 
-    # 1. Frequency check
     recent_uploads = get_channel_uploads_last_24h(history, channel_name)
     if len(recent_uploads) >= freq:
         logger.info(
@@ -101,7 +93,6 @@ def can_upload(channel, history):
         )
         return False
 
-    # 2. Delay check
     last_time = get_last_upload_time(history, channel_name)
     now = time.time()
     if now - last_time < min_delay:
@@ -117,6 +108,19 @@ async def process_tiktok_channel(channel, downloader, history):
         return
 
     channel_name = channel.get("channel_name")
+
+    # Pre-check login
+    is_logged_in = await asyncio.to_thread(
+        verify_login_status,
+        gmail=channel.get("gmail"),
+        password=channel.get("password"),
+        cookies_path=channel.get("cookies_path"),
+        headless=True,
+    )
+    if not is_logged_in:
+        logger.error(f"Login failed for {channel_name}. Skipping.")
+        return
+
     tiktok_sources = channel.get("tiktok_sources", [])
     watch_folder = channel.get("watch_folder", "data/tiktok_downloads")
     cookies = channel.get("cookies_path")
@@ -125,9 +129,7 @@ async def process_tiktok_channel(channel, downloader, history):
     logger.info(f"--- Processing TikTok Channel: {channel_name} ---")
 
     for tt_user in tiktok_sources:
-        logger.info(f"Checking TikTok user: @{tt_user}")
         videos = await downloader.get_user_videos(tt_user, count=5)
-
         if not videos:
             continue
 
@@ -136,37 +138,31 @@ async def process_tiktok_channel(channel, downloader, history):
             if not video_id or is_item_processed(history, channel_name, video_id):
                 continue
 
-            logger.info(f"Found new TikTok video: {video_id}")
-
+            logger.info(f"Downloading new TikTok video: {video_id}")
             output_path = os.path.join(watch_folder, f"{tt_user}_{video_id}.mp4")
             os.makedirs(watch_folder, exist_ok=True)
 
-            success = await downloader.download_video(video, output_path)
-            if not success:
-                continue
-
-            metadata = {
-                "title": (video.get("title", "")[:70] + " #shorts #tiktok"),
-                "description": f"Original video by @{tt_user} on TikTok. #shorts #tiktok",
-                "gmail": channel.get("gmail"),
-                "password": channel.get("password"),
-            }
-
-            try:
-                await asyncio.to_thread(
-                    upload_video_via_browser,
-                    video_path=os.path.abspath(output_path),
-                    metadata=metadata,
-                    proxy=proxy,
-                    cookies_path=cookies,
-                    headless=True,
-                )
-                mark_item_processed(history, channel_name, video_id)
-                save_history(history)
-                logger.info(f"TikTok video {video_id} uploaded successfully.")
-                return  # Only one per run to respect delays
-            except Exception as e:
-                logger.error(f"TikTok upload failed: {e}")
+            if await downloader.download_video(video, output_path):
+                metadata = {
+                    "title": (video.get("title", "")[:70] + " #shorts #tiktok"),
+                    "description": f"Original video by @{tt_user} on TikTok. #shorts #tiktok",
+                    "gmail": channel.get("gmail"),
+                    "password": channel.get("password"),
+                }
+                try:
+                    await asyncio.to_thread(
+                        upload_video_via_browser,
+                        video_path=os.path.abspath(output_path),
+                        metadata=metadata,
+                        proxy=proxy,
+                        cookies_path=cookies,
+                        headless=False,
+                    )
+                    mark_item_processed(history, channel_name, video_id)
+                    save_history(history)
+                    return  # Respect delay
+                except Exception as e:
+                    logger.error(f"TikTok upload failed: {e}")
 
 
 async def process_genai_channel(channel, history):
@@ -174,84 +170,114 @@ async def process_genai_channel(channel, history):
         return
 
     channel_name = channel.get("channel_name")
+
+    # Pre-check login
+    is_logged_in = await asyncio.to_thread(
+        verify_login_status,
+        gmail=channel.get("gmail"),
+        password=channel.get("password"),
+        cookies_path=channel.get("cookies_path"),
+        headless=True,
+    )
+    if not is_logged_in:
+        logger.error(f"Login failed for {channel_name}. Skipping.")
+        return
+
     topics = channel.get("genai_topics", [])
     lang = channel.get("lang", "ru")
+    quality = channel.get("quality", "easy")
     cookies = channel.get("cookies_path")
     proxy = channel.get("proxy")
 
     logger.info(f"--- Processing GenAI Channel: {channel_name} ---")
-
     if not topics:
         return
 
-    # Choose a topic
     topic = random.choice(topics)
     item_id = f"genai_{topic.replace(' ', '_').lower()}_{lang}"
-
     if is_item_processed(history, channel_name, item_id):
-        logger.info(f"Topic already processed: {topic}")
         return
-
-    logger.info(f"Generating video for topic: {topic} ({lang})")
 
     try:
         video_path = await asyncio.to_thread(
-            create_content, topic=topic, channel_name=channel_name, language=lang
+            create_content,
+            topic=topic,
+            channel_name=channel_name,
+            language=lang,
+            quality=quality,
         )
-
-        if not video_path or not os.path.exists(video_path):
-            return
-
-        metadata = {
-            "title": f"{topic} #shorts",
-            "description": f"Interesting facts about {topic}. Generated by AI. #shorts #genai",
-            "gmail": channel.get("gmail"),
-            "password": channel.get("password"),
-        }
-
-        await asyncio.to_thread(
-            upload_video_via_browser,
-            video_path=os.path.abspath(video_path),
-            metadata=metadata,
-            proxy=proxy,
-            cookies_path=cookies,
-            headless=True,
-        )
-
-        mark_item_processed(history, channel_name, item_id)
-        save_history(history)
-        logger.info(f"GenAI video for '{topic}' uploaded successfully.")
-
+        if video_path and os.path.exists(video_path):
+            metadata = {
+                "title": f"{topic} #shorts",
+                "description": f"Interesting facts about {topic}. #shorts #genai",
+                "gmail": channel.get("gmail"),
+                "password": channel.get("password"),
+            }
+            await asyncio.to_thread(
+                upload_video_via_browser,
+                video_path=os.path.abspath(video_path),
+                metadata=metadata,
+                proxy=proxy,
+                cookies_path=cookies,
+                headless=False,
+            )
+            mark_item_processed(history, channel_name, item_id)
+            save_history(history)
     except Exception as e:
-        logger.error(f"GenAI process failed: {e}")
+        logger.error(f"GenAI failed: {e}")
 
 
-async def main():
-    logger.info("Initializing Unified Automation Engine with Scheduling...")
+async def run_full_cycle():
+    """Runs a single pass through all channels."""
+    logger.info("Starting a single automation cycle...")
+    downloader = TikTokDownloader()
+    channels = load_config()
+    history = load_history()
+
+    for channel in channels:
+        mode = channel.get("mode", "tiktok").lower()
+        if mode == "tiktok":
+            await process_tiktok_channel(channel, downloader, history)
+        elif mode == "genai":
+            await process_genai_channel(channel, history)
+    logger.info("Cycle finished.")
+
+
+async def run_for_channel(channel_name):
+    """Runs automation for a specific channel name."""
+    logger.info(f"Triggering manual run for channel: {channel_name}")
+    channels = load_config()
+    history = load_history()
     downloader = TikTokDownloader()
 
+    target = next((c for c in channels if c.get("channel_name") == channel_name), None)
+    if not target:
+        logger.error(f"Channel {channel_name} not found in config.")
+        return False
+
+    mode = target.get("mode", "tiktok").lower()
+    if mode == "tiktok":
+        await process_tiktok_channel(target, downloader, history)
+    elif mode == "genai":
+        await process_genai_channel(target, history)
+    return True
+
+
+async def main_loop():
+    logger.info("Starting Automation Engine (Loop mode)...")
+    downloader = TikTokDownloader()
     while True:
         try:
-            channels = load_config()
-            history = load_history()
-
-            for channel in channels:
-                mode = channel.get("mode", "tiktok").lower()
-                if mode == "tiktok":
-                    await process_tiktok_channel(channel, downloader, history)
-                elif mode == "genai":
-                    await process_genai_channel(channel, history)
-
-            logger.info("Cycle complete. Sleeping for 10 minutes...")
+            await run_full_cycle()
+            logger.info("Cycle complete. Sleeping 10m...")
             await asyncio.sleep(600)
-
         except Exception as e:
-            logger.error(f"Fatal error in main loop: {e}")
+            logger.error(f"Main loop error: {e}")
             await asyncio.sleep(60)
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        asyncio.run(main_loop())
     except KeyboardInterrupt:
-        logger.info("Automation stopped by user.")
+        logger.info("Stopped.")

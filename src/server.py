@@ -1,34 +1,88 @@
-import uvicorn
-from fastapi import BackgroundTasks, FastAPI
-from pydantic import BaseModel
+import logging
+import json
+import os
+import threading
+import asyncio
+from flask import Flask, jsonify, request
+from main import run_full_cycle, run_for_channel, load_config, load_history
 
-from src.factory import create_content
+app = Flask(__name__)
+logger = logging.getLogger("server")
 
-app = FastAPI()
-
-
-class VideoRequest(BaseModel):
-    topic: str
-    channel: str = "DefaultChannel"
-
-
-@app.post("/generate")
-async def generate_video(req: VideoRequest, background_tasks: BackgroundTasks):
-    """
-    Endpoint to trigger video generation.
-    """
-    # Run in background to avoid timeout
-    background_tasks.add_task(create_content, req.topic, req.channel)
-    return {
-        "status": "accepted",
-        "message": f"Generation started for topic: {req.topic}",
-    }
+# Global lock to prevent multiple overlapping runs if triggered manually
+run_lock = threading.Lock()
 
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+def start_async_task(coro):
+    """Helper to run async coroutines from Flask routes in a background thread."""
+
+    def _target():
+        asyncio.run(coro)
+
+    if run_lock.acquire(blocking=False):
+        try:
+            threading.Thread(target=_target).start()
+            return True
+        finally:
+            run_lock.release()
+    return False
+
+
+@app.route("/stats", methods=["GET"])
+def get_stats():
+    """Returns the current upload history."""
+    try:
+        history = load_history()
+        return jsonify(history)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/config", methods=["GET"])
+def get_config():
+    """Returns the current channel configuration."""
+    try:
+        config = load_config()
+        # Strip passwords for security in API response
+        safe_config = []
+        for c in config:
+            c_copy = c.copy()
+            if "password" in c_copy:
+                c_copy["password"] = "******"
+            safe_config.append(c_copy)
+        return jsonify(safe_config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/run/all", methods=["POST"])
+def run_all():
+    """Triggers a full automation cycle for all channels."""
+    if start_async_task(run_full_cycle()):
+        return jsonify({"status": "Cycle started in background."})
+    else:
+        return jsonify({"error": "A task is already running."}), 429
+
+
+@app.route("/run/channel/<string:channel_name>", methods=["POST"])
+def run_channel(channel_name):
+    """Triggers automation for a specific channel."""
+    if start_async_task(run_for_channel(channel_name)):
+        return jsonify({"status": f"Job for {channel_name} started in background."})
+    else:
+        return jsonify({"error": "A task is already running."}), 429
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy"})
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    from src.utils.logging_config import setup_logging
+
+    setup_logging()
+
+    # Run server on 0.0.0.0 for Docker/n8n access
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
