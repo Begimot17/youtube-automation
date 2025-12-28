@@ -222,7 +222,7 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Triggers custom video generation."""
     if not context.args:
-        await update.message.reply_text('Usage: /generate <Topic> [en|ru]')
+        await update.message.reply_text("Usage: /generate <Topic> [en|ru]")
         return
 
     args = context.args

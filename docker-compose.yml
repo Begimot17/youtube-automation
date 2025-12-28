@@ -37,10 +37,10 @@ services:
     env_file:
       - .env
     volumes:
-      - ./auth:/app/auth
-      - ./config:/app/config
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ./auth:/app/src/auth
+      - ./config:/app/src/config
+      - ./data:/app/src/data
+      - ./logs:/app/src/logs
     stdin_open: true
     tty: true
 

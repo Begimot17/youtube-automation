@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/playwright/python:v1.57.0-jammy
 
 # Install system dependencies for MoviePy, Audio, and Xvfb
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ffmpeg \
     fonts-liberation \
     xvfb \
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     x11-xserver-utils \
     x11vnc \
     fluxbox \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

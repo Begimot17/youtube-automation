@@ -68,7 +68,7 @@ class VideoRenderer:
         final_clip.write_videofile(output_path, fps=24)
         logger.info("Done.")
 
-    def _create_text_clip_pil(self, text, duration, color="yellow", font_size=80):
+    def _create_text_clip_pil(self, text, duration, color="yellow", font_size=120):
         """
         Creates a text clip using PIL (no ImageMagick dependency).
         """
@@ -83,6 +83,10 @@ class VideoRenderer:
                 "C:/Windows/Fonts/arialbd.ttf",
                 "C:/Windows/Fonts/arial.ttf",
                 "C:/Windows/Fonts/seguiemj.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "LiberationSans-Bold",  # Font name for some systems
+                "Arial.ttf",  # common fallback
+                "sans-serif",  # generic fallback
             ]
             for p in font_paths:
                 if os.path.exists(p):
