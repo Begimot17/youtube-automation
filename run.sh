@@ -15,10 +15,12 @@ fi
 # Set PYTHONPATH to current directory
 export PYTHONPATH=$(pwd)
 
-# Activate virtual environment if it exists
+# Determine Python executable
+PYTHON_EXEC="python"
 if [ -f .venv/bin/activate ]; then
     echo "[INFO] Activating virtual environment..."
     source .venv/bin/activate
+    PYTHON_EXEC="$(pwd)/.venv/bin/python"
 else
     echo "[WARNING] .venv not found. Running with system python..."
 fi
@@ -30,24 +32,32 @@ playwright install > /dev/null
 
 # Run Database Migrations
 echo "[INFO] Running database migrations..."
-python src/scripts/migrate_to_db.py
+$PYTHON_EXEC src/scripts/migrate_to_db.py
+
+# NOTE: The following commands open new terminal windows using 'gnome-terminal'.
+# If you use a different terminal (e.g., konsole, xterm, or on macOS),
+# you will need to modify these lines.
+KEEP_TERMINAL_OPEN_CMD="echo; echo 'Process finished or crashed. Press Enter to close terminal.'; read"
 
 # Start Server (API)
 echo "[INFO] Starting API Server..."
-python src/server.py > /dev/null 2>&1 &
+SERVER_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC src/server.py; $KEEP_TERMINAL_OPEN_CMD"
+gnome-terminal --title="YouTube Auto: Server" -- bash -c "$SERVER_CMD" &
 
 # Wait a few seconds for server to initialize
 sleep 5
 
 # Start Automation Engine (Loop)
 echo "[INFO] Starting Automation Engine..."
-python main.py > /dev/null 2>&1 &
+ENGINE_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC main.py; $KEEP_TERMINAL_OPEN_CMD"
+gnome-terminal --title="YouTube Auto: Engine" -- bash -c "$ENGINE_CMD" &
 
 # Start Telegram Bot
 echo "[INFO] Starting Telegram Bot..."
-python src/telegram_bot.py > /dev/null 2>&1 &
+BOT_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC src/telegram_bot.py; $KEEP_TERMINAL_OPEN_CMD"
+gnome-terminal --title="YouTube Auto: Bot" -- bash -c "$BOT_CMD" &
 
 echo "##########################################"
-echo "# Processes started in the background.   #"
+echo "# Processes started in separate windows.   #"
 echo "# Use Telegram Bot to control.           #"
 echo "##########################################"
