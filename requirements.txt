@@ -12,7 +12,7 @@ gspread
 google-auth
 TikTokApi
 yt-dlp
-google-genai
+google-generativeai
 edge-tts
 nest-asyncio
 flask
