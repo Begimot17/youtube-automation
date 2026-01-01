@@ -51,7 +51,7 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
         page = context.new_page()
 
         try:
-            page.goto("https://www.youtube.com/upload", timeout=60000)
+            page.goto("https://www.youtube.com/upload", timeout=180000)
 
             if "accounts.google.com" in page.url:
                 logger.info("Session expired. Auto-login initiated...")
@@ -62,13 +62,13 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
                     browser = p.chromium.launch(headless=False, args=browser_args)
                     context = browser.new_context(**context_options)
                     page = context.new_page()
-                    page.goto("https://www.youtube.com/upload", timeout=60000)
+                    page.goto("https://www.youtube.com/upload", timeout=180000)
 
                 if gmail and password:
                     try:
                         page.fill('input[type="email"]', gmail)
                         page.click("#identifierNext")
-                        page.wait_for_selector('input[type="password"]', timeout=15000)
+                        page.wait_for_selector('input[type="password"]', timeout=45000)
                         page.fill('input[type="password"]', password)
                         page.click("#passwordNext")
                     except Exception:
@@ -82,7 +82,7 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
 
                 if choice == "y":
                     try:
-                        page.wait_for_url("**/upload**", timeout=10000)
+                        page.wait_for_url("**/upload**", timeout=30000)
                         logger.info("Login confirmed by user.")
                         if cookies_path:
                             context.storage_state(path=cookies_path)
@@ -131,7 +131,7 @@ def upload_video_via_browser(
         page = context.new_page()
 
         try:
-            page.goto("https://www.youtube.com/upload", timeout=90000)
+            page.goto("https://www.youtube.com/upload", timeout=270000)
 
             # Re-check login just in case, though main should handle it
             if "accounts.google.com" in page.url:
@@ -141,10 +141,10 @@ def upload_video_via_browser(
                 if gmail and password:
                     page.fill('input[type="email"]', gmail)
                     page.click("#identifierNext")
-                    page.wait_for_selector('input[type="password"]', timeout=30000)
+                    page.wait_for_selector('input[type="password"]', timeout=90000)
                     page.fill('input[type="password"]', password)
                     page.click("#passwordNext")
-                    page.wait_for_url("**/upload**", timeout=60000)
+                    page.wait_for_url("**/upload**", timeout=180000)
                     if cookies_path:
                         context.storage_state(path=cookies_path)
 
@@ -158,7 +158,7 @@ def upload_video_via_browser(
 
             logger.info("Filling metadata...")
             title_input = page.locator("#title-textarea #textbox")
-            title_input.wait_for(timeout=60000)
+            title_input.wait_for(timeout=180000)
             title_input.fill(metadata.get("title", "New Video"))
 
             desc_input = page.locator("#description-textarea #textbox")
