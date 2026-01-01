@@ -47,7 +47,7 @@ def create_content(
 
     # 3. Subtitles
     logger.info("Step 3: Generating Subtitles")
-    subs = subtitles.generate_subtitles(audio_path)
+    subs = subtitles.generate_subtitles_v2(audio_path, language=language)
 
     # 4. Visuals
     logger.info("Step 4: Fetching Visuals")

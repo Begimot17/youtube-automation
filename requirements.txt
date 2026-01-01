@@ -21,3 +21,4 @@ sqlalchemy
 mysql-connector-python
 cryptography
 python-telegram-bot
+assemblyai

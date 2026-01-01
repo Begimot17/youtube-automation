@@ -34,18 +34,18 @@ python src/scripts/migrate_to_db.py
 
 # Start Server (API)
 echo "[INFO] Starting API Server..."
-python src/server.py &
+python src/server.py > /dev/null 2>&1 &
 
 # Wait a few seconds for server to initialize
 sleep 5
 
 # Start Automation Engine (Loop)
 echo "[INFO] Starting Automation Engine..."
-python main.py &
+python main.py > /dev/null 2>&1 &
 
 # Start Telegram Bot
 echo "[INFO] Starting Telegram Bot..."
-python src/telegram_bot.py &
+python src/telegram_bot.py > /dev/null 2>&1 &
 
 echo "##########################################"
 echo "# Processes started in the background.   #"

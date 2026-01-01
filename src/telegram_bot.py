@@ -15,7 +15,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("telegram_bot")
 
-import os
 
 TOKEN = Config.TELEGRAM_BOT_TOKEN
 AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID

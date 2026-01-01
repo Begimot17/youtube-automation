@@ -52,4 +52,4 @@ echo ##########################################
 echo # Processes started in separate windows. #
 echo # Use Telegram Bot to control.           #
 echo ##########################################
-pause
+exit
