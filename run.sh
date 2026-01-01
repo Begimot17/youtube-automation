@@ -4,6 +4,9 @@ echo "##########################################"
 echo "#   YouTube Automation Startup Script    #"
 echo "##########################################"
 
+# Exit on error
+set -e
+
 # Check if .env exists
 if [ ! -f .env ]; then
     echo "[ERROR] .env file not found!"
@@ -12,52 +15,65 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Set PYTHONPATH to current directory
-export PYTHONPATH=$(pwd)
+# Set PYTHONPATH
+export PYTHONPATH="$(pwd)"
+
+# Detect OS
+OS="$(uname -s)"
+echo "[INFO] Detected OS: $OS"
 
 # Determine Python executable
-PYTHON_EXEC="python"
-if [ -f .venv/bin/activate ]; then
+PYTHON_EXEC="python3"
+if [ -f ".venv/bin/activate" ]; then
     echo "[INFO] Activating virtual environment..."
     source .venv/bin/activate
     PYTHON_EXEC="$(pwd)/.venv/bin/python"
 else
-    echo "[WARNING] .venv not found. Running with system python..."
+    echo "[WARNING] .venv not found. Using system python..."
 fi
 
-# Check dependencies
-echo "[INFO] Checking for missing dependencies..."
+# Install dependencies
+echo "[INFO] Checking dependencies..."
 pip install -r requirements.txt > /dev/null
 playwright install > /dev/null
 
-# Run Database Migrations
+# Run migrations
 echo "[INFO] Running database migrations..."
 $PYTHON_EXEC src/scripts/migrate_to_db.py
 
-# NOTE: The following commands open new terminal windows using 'gnome-terminal'.
-# If you use a different terminal (e.g., konsole, xterm, or on macOS),
-# you will need to modify these lines.
-KEEP_TERMINAL_OPEN_CMD="echo; echo 'Process finished or crashed. Press Enter to close terminal.'; read"
+##########################################
+# Terminal launcher (Linux / macOS)
+##########################################
 
-# Start Server (API)
+run_in_new_terminal () {
+    TITLE="$1"
+    CMD="$2"
+
+    if [[ "$OS" == "Darwin" ]]; then
+        # macOS (Terminal.app)
+        osascript -e "tell application \"Terminal\" to do script \"cd $(pwd); export PYTHONPATH=$(pwd); $CMD\""
+    else
+        # Linux (gnome-terminal)
+        gnome-terminal --title="$TITLE" -- bash -c "cd $(pwd); export PYTHONPATH=$(pwd); $CMD; exec bash"
+    fi
+}
+
+##########################################
+# Start services
+##########################################
+
 echo "[INFO] Starting API Server..."
-SERVER_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC src/server.py; $KEEP_TERMINAL_OPEN_CMD"
-gnome-terminal --title="YouTube Auto: Server" -- bash -c "$SERVER_CMD" &
+run_in_new_terminal "YouTube Auto: Server" "$PYTHON_EXEC src/server.py"
 
-# Wait a few seconds for server to initialize
 sleep 5
 
-# Start Automation Engine (Loop)
 echo "[INFO] Starting Automation Engine..."
-ENGINE_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC main.py; $KEEP_TERMINAL_OPEN_CMD"
-gnome-terminal --title="YouTube Auto: Engine" -- bash -c "$ENGINE_CMD" &
+run_in_new_terminal "YouTube Auto: Engine" "$PYTHON_EXEC main.py"
 
-# Start Telegram Bot
 echo "[INFO] Starting Telegram Bot..."
-BOT_CMD="export PYTHONPATH=$(pwd); $PYTHON_EXEC src/telegram_bot.py; $KEEP_TERMINAL_OPEN_CMD"
-gnome-terminal --title="YouTube Auto: Bot" -- bash -c "$BOT_CMD" &
+run_in_new_terminal "YouTube Auto: Bot" "$PYTHON_EXEC src/telegram_bot.py"
 
 echo "##########################################"
-echo "# Processes started in separate windows.   #"
-echo "# Use Telegram Bot to control.           #"
+echo "# Processes started in separate windows  #"
+echo "# Control via Telegram Bot               #"
 echo "##########################################"
