@@ -20,7 +20,11 @@ logger = logging.getLogger("db")
 DATABASE_URL = Config.DATABASE_URL
 
 Base = declarative_base()
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine_args = {"pool_pre_ping": True}
+if DATABASE_URL.startswith("sqlite"):
+    engine_args["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

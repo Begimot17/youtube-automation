@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import os
 
 import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -14,9 +15,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("telegram_bot")
 
+import os
+
 TOKEN = Config.TELEGRAM_BOT_TOKEN
 AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID
-API_BASE_URL = "http://server:5000"
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:5000")
 
 
 def restricted(func):

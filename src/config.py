@@ -23,9 +23,16 @@ class Config:
     TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
     # Database
+    DB_TYPE = os.environ.get("DB_TYPE", "mysql").lower()
     # Default for local dev if not in docker
     DEFAULT_DB = "mysql+mysqlconnector://user:user_password@localhost:3307/automation"
-    DATABASE_URL = os.environ.get("DATABASE_URL") or DEFAULT_DB
+
+    if DB_TYPE == "sqlite":
+        # Ensure data directory exists for sqlite
+        os.makedirs("data", exist_ok=True)
+        DATABASE_URL = os.environ.get("DATABASE_URL") or "sqlite:///data/automation.db"
+    else:
+        DATABASE_URL = os.environ.get("DATABASE_URL") or DEFAULT_DB
 
     # Server
     PORT = int(os.environ.get("PORT", 5000))
