@@ -18,7 +18,7 @@ logger = logging.getLogger("telegram_bot")
 
 TOKEN = Config.TELEGRAM_BOT_TOKEN
 AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID
-API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:5000")
+API_BASE_URL = Config.API_BASE_URL
 
 
 def restricted(func):

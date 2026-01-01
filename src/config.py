@@ -17,6 +17,7 @@ class Config:
 
     # Pexels
     PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+    API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:5000")
 
     # Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
