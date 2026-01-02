@@ -6,11 +6,13 @@ import os
 # The deprecation warning is acceptable for now to ensure the code runs.
 import google.generativeai as genai
 
+from src.config import Config
+
 # Global client and model ID
 _client = None
 logger = logging.getLogger(__name__)
 # Use the 'latest' version to avoid the 'not found' error
-MODEL_ID = "gemini-2.5-flash-lite"
+GEMINI_MODEL_ID = Config.GEMINI_MODEL_ID
 
 
 def get_client():
@@ -35,7 +37,7 @@ def get_client():
 
         genai.configure(api_key=api_key)
         _client = genai.GenerativeModel(
-            MODEL_ID,
+            GEMINI_MODEL_ID,
             system_instruction="""
 You are a creative director and expert scriptwriter for viral YouTube Shorts.
 Your goal is to create scripts that are fast-paced, highly engaging, and visually compelling.

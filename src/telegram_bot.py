@@ -62,7 +62,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/status", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/status", timeout=15)
         data = response.json()
         status = data.get("status", "Unknown")
         job = data.get("job", "None")
@@ -82,7 +82,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists all channels with interactive buttons."""
     try:
-        response = requests.get(f"{API_BASE_URL}/channels", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/channels", timeout=15)
         channels = response.json()
 
         if not channels:
@@ -118,7 +118,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "run":
         try:
-            response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=5)
+            response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=15)
             if response.status_code == 200:
                 await query.edit_message_text(
                     f"🚀 <b>{html.escape(name)}</b>: Started successfully!",
@@ -135,7 +135,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "del":
         try:
-            response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=5)
+            response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=15)
             if response.status_code == 200:
                 await query.edit_message_text(
                     f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!",
@@ -158,7 +158,7 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     name = context.args[0]
     try:
-        response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=5)
+        response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=15)
         if response.status_code == 200:
             await update.message.reply_html(
                 f"🚀 <b>{html.escape(name)}</b>: Started successfully!"
@@ -184,7 +184,7 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     json_str = " ".join(context.args)
     try:
         data = json.loads(json_str)
-        response = requests.post(f"{API_BASE_URL}/channel", json=data, timeout=5)
+        response = requests.post(f"{API_BASE_URL}/channel", json=data, timeout=15)
         if response.status_code == 201:
             await update.message.reply_html(
                 f"✅ <b>{html.escape(data['channel_name'])}</b>: Created successfully!"
@@ -207,7 +207,7 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     name = context.args[0]
     try:
-        response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=5)
+        response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=15)
         if response.status_code == 200:
             await update.message.reply_html(
                 f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!"
@@ -241,7 +241,7 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = requests.post(
             f"{API_BASE_URL}/render/custom",
             json={"topic": topic, "lang": lang},
-            timeout=5,
+            timeout=15,
         )
         if response.status_code == 200:
             safe_topic = html.escape(topic)
@@ -262,7 +262,7 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.post(f"{API_BASE_URL}/run/all", timeout=5)
+        response = requests.post(f"{API_BASE_URL}/run/all", timeout=15)
         data = response.json()
         if response.status_code == 200:
             await update.message.reply_html(
@@ -279,7 +279,7 @@ async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.post(f"{API_BASE_URL}/cleanup", timeout=10)
+        response = requests.post(f"{API_BASE_URL}/cleanup", timeout=30)
         data = response.json()
         cleaned = data.get("cleaned_directories", [])
         msg = "🧹 <b>Cleanup finished:</b>\n" + "\n".join([f"- {d}" for d in cleaned])
@@ -291,7 +291,7 @@ async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/logs", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/logs", timeout=15)
         lines = response.json()
         # Take last 50 lines to keep message size reasonable
         log_text = "".join(lines[-50:])
@@ -310,7 +310,7 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def disk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/disk", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/disk", timeout=15)
         stats = response.json()
         msg = "💾 <b>Disk Usage:</b>\n"
         for folder, size in stats.items():

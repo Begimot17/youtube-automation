@@ -25,7 +25,7 @@ def send_telegram_message(message, parse_mode="HTML"):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": parse_mode}
 
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
         return True
     except Exception as e:
@@ -69,7 +69,7 @@ def send_telegram_video(video_path, caption=None):
             if caption:
                 data["caption"] = caption
 
-            response = requests.post(url, data=data, files=files, timeout=60)
+            response = requests.post(url, data=data, files=files, timeout=180)
             response.raise_for_status()
             return True
     except Exception as e:

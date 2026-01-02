@@ -5,11 +5,13 @@ import os
 import assemblyai
 import google.generativeai as genai
 
+from src.config import Config
+
 logger = logging.getLogger(__name__)
 
 # --- Gemini Configuration (Original) ---
 _gemini_client = None
-GEMINI_MODEL_ID = "gemini-2.5-flash-lite"
+GEMINI_MODEL_ID = Config.GEMINI_MODEL_ID
 
 
 def get_gemini_client():

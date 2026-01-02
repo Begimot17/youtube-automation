@@ -14,6 +14,7 @@ class Config:
     GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") or os.environ.get(
         "GEMINI_API_KEY"
     )
+    GEMINI_MODEL_ID = os.environ.get("GEMINI_MODEL_ID") or "gemini-2.5-flash-lite"
 
     # Pexels
     PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
