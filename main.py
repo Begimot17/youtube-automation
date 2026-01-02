@@ -182,9 +182,20 @@ async def process_genai_channel(channel, db):
     if not topics:
         return
 
-    topic = random.choice(topics)
-    item_id = f"genai_{topic.replace(' ', '_').lower()}_{lang}"
-    if is_item_processed(db, channel.id, item_id):
+    shuffled_topics = list(topics)
+    random.shuffle(shuffled_topics)
+
+    topic = None
+    item_id = None
+    for t in shuffled_topics:
+        current_item_id = f"genai_{t.replace(' ', '_').lower()}_{lang}"
+        if not is_item_processed(db, channel.id, current_item_id):
+            topic = t
+            item_id = current_item_id
+            break
+
+    if not topic:
+        logger.info(f"All GenAI topics for {channel.channel_name} have been processed.")
         return
 
     try:
