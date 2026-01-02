@@ -18,7 +18,7 @@ services:
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-puser_password" ]
       interval: 5s
-      timeout: 5s
+      timeout: 15s
       retries: 10
 
   # The Python Automation Server
