@@ -93,20 +93,6 @@ async def process_tiktok_channel(channel, downloader, db):
     if not can_upload(channel, db):
         return
 
-    # Pre-check login
-    is_logged_in = await asyncio.to_thread(
-        verify_login_status,
-        gmail=channel.gmail,
-        password=channel.password,
-        cookies_path=channel.cookies_path,
-        headless=False,
-    )
-    if not is_logged_in:
-        msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
-        send_telegram_message(msg)
-        logger.error(f"Login failed for {channel.channel_name}. Skipping.")
-        return
-
     tiktok_sources = channel.tiktok_sources or []
     watch_folder = channel.watch_folder or "data/tiktok_downloads"
     cookies = channel.cookies_path
@@ -137,6 +123,18 @@ async def process_tiktok_channel(channel, downloader, db):
                     "password": channel.password,
                 }
                 try:
+                    is_logged_in = await asyncio.to_thread(
+                        verify_login_status,
+                        gmail=channel.gmail,
+                        password=channel.password,
+                        cookies_path=channel.cookies_path,
+                        headless=False,
+                    )
+                    if not is_logged_in:
+                        msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
+                        send_telegram_message(msg)
+                        logger.error(f"Login failed for {channel.channel_name}. Skipping.")
+                        return
                     await asyncio.to_thread(
                         upload_video_via_browser,
                         video_path=os.path.abspath(output_path),
