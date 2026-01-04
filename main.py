@@ -5,6 +5,7 @@ import random
 import time
 from datetime import datetime, timedelta
 
+from src.config import Config
 from src.factory import create_content
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import (
@@ -18,6 +19,7 @@ from src.utils.notifications import send_telegram_message, send_upload_report
 # Configure logging
 setup_logging()
 logger = logging.getLogger("main")
+TIKTOK_DOWNLOAD_COUNT = Config.TIKTOK_DOWNLOAD_COUNT
 
 
 def get_channel_uploads_last_24h(db, channel_id):
@@ -112,7 +114,7 @@ async def process_tiktok_channel(channel, downloader, db):
     logger.info(f"--- Processing TikTok Channel: {channel.channel_name} ---")
 
     for tt_user in tiktok_sources:
-        videos = await downloader.get_user_videos(tt_user, count=5)
+        videos = await downloader.get_user_videos(tt_user, count=TIKTOK_DOWNLOAD_COUNT)
         if not videos:
             continue
 

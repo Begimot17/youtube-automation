@@ -26,6 +26,7 @@ class Config:
 
     # Database
     DB_TYPE = os.environ.get("DB_TYPE", "mysql").lower()
+    TIKTOK_DOWNLOAD_COUNT = os.environ.get("TIKTOK_DOWNLOAD_COUNT", 2)
     # Default for local dev if not in docker
     DEFAULT_DB = "mysql+mysqlconnector://user:user_password@localhost:3307/automation"
 
