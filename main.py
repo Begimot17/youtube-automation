@@ -127,10 +127,9 @@ async def process_tiktok_channel(channel, downloader, db):
 
             if await downloader.download_video(video, output_path):
                 title = video.get("title", "")[:70] + " #shorts #tiktok"
-                description = channel.description or "#shorts #tiktok"
                 metadata = {
                     "title": title,
-                    "description": description,
+                    "description": channel.description or "#shorts #tiktok",
                     "gmail": channel.gmail,
                     "password": channel.password,
                 }
@@ -212,7 +211,7 @@ async def process_genai_channel(channel, db):
             title = f"{topic} #shorts"
             metadata = {
                 "title": title,
-                "description": f"Interesting facts about {topic}. #shorts #genai",
+                "description": channel.description or "#shorts #tiktok",
                 "gmail": channel.gmail,
                 "password": channel.password,
             }
