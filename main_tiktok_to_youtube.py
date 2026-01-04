@@ -5,6 +5,7 @@ import os
 
 from dotenv import load_dotenv
 
+from src.config import Config
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import upload_video_via_browser
 from src.utils.logging_config import setup_logging
@@ -18,6 +19,7 @@ logger = logging.getLogger("main")
 
 CONFIG_PATH = "config/channels.json"
 HISTORY_PATH = "config/upload_history.json"
+TIKTOK_DOWNLOAD_COUNT = Config.TIKTOK_DOWNLOAD_COUNT
 
 
 def load_config():
@@ -66,7 +68,7 @@ async def process_channel(channel, downloader, history):
 
     for tt_user in tiktok_sources:
         logger.info(f"--- Checking TikTok: @{tt_user} ---")
-        videos = await downloader.get_user_videos(tt_user, count=3)
+        videos = await downloader.get_user_videos(tt_user, count=TIKTOK_DOWNLOAD_COUNT)
 
         if not videos:
             logger.warning(f"No videos found for @{tt_user}")
