@@ -127,9 +127,10 @@ async def process_tiktok_channel(channel, downloader, db):
 
             if await downloader.download_video(video, output_path):
                 title = video.get("title", "")[:70] + " #shorts #tiktok"
+                description = channel.description or "#shorts #tiktok"
                 metadata = {
                     "title": title,
-                    "description": f"Original video by @{tt_user} on TikTok. #shorts #tiktok",
+                    "description": description,
                     "gmail": channel.gmail,
                     "password": channel.password,
                 }
