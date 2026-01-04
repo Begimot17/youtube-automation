@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.config import Config
 from src.factory import create_content
@@ -23,7 +23,7 @@ TIKTOK_DOWNLOAD_COUNT = Config.TIKTOK_DOWNLOAD_COUNT
 
 
 def get_channel_uploads_last_24h(db, channel_id):
-    day_ago = datetime.utcnow() - timedelta(days=1)
+    day_ago = datetime.now(timezone.utc) - timedelta(days=1)
     return (
         db.query(UploadHistory)
         .filter(
@@ -43,7 +43,8 @@ def get_last_upload_time(db, channel_id):
 
     if not last_upload:
         return 0
-    return last_upload.timestamp.timestamp()
+    # This is the key fix: treat the naive datetime from DB as UTC
+    return last_upload.timestamp.replace(tzinfo=timezone.utc).timestamp()
 
 
 def is_item_processed(db, channel_id, item_id):
@@ -59,7 +60,7 @@ def is_item_processed(db, channel_id, item_id):
 
 def mark_item_processed(db, channel_id, item_id):
     upload = UploadHistory(
-        channel_id=channel_id, item_id=item_id, timestamp=datetime.utcnow()
+        channel_id=channel_id, item_id=item_id, timestamp=datetime.now(timezone.utc)
     )
     db.add(upload)
     db.commit()
