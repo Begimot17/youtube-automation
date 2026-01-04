@@ -45,6 +45,7 @@ def migrate():
                             quality=c_data.get("quality", "easy"),
                             lang=c_data.get("lang", "ru"),
                             voice=c_data.get("voice"),
+                            description=c_data.get("description", "#shorts #tiktok"),
                             tiktok_sources=c_data.get("tiktok_sources", []),
                             genai_topics=c_data.get("genai_topics", []),
                         )
@@ -67,6 +68,7 @@ def migrate():
                         existing.quality = c_data.get("quality", existing.quality)
                         existing.lang = c_data.get("lang", existing.lang)
                         existing.voice = c_data.get("voice", existing.voice)
+                        existing.description = c_data.get("description", existing.description)
                         existing.tiktok_sources = c_data.get("tiktok_sources", existing.tiktok_sources)
                         existing.genai_topics = c_data.get("genai_topics", existing.genai_topics)
                         print(f"Updating existing channel: {c_data['channel_name']}")

@@ -44,6 +44,7 @@ class Channel(Base):
     quality = Column(String(20), default="easy")
     lang = Column(String(10), default="ru")
     voice = Column(String(100))
+    description = Column(String(1000), default="#shorts #tiktok")
 
     # Mode-specific data
     tiktok_sources = Column(JSON)  # List of strings

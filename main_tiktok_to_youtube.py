@@ -101,9 +101,10 @@ async def process_channel(channel, downloader, history):
                 else (tt_title[:70] + "... #shorts")
             )
 
+            description = channel.get("description", "#shorts #tiktok")
             metadata = {
                 "title": yt_title,
-                "description": f"Original video by @{tt_user} on TikTok. #shorts #tiktok #trending",
+                "description": description,
             }
 
             logger.info(f"Uploading to YouTube: {yt_title}")
