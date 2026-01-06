@@ -91,8 +91,8 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
                             context.storage_state(path=cookies_path)
                             logger.info(f"Saved fresh cookies to {cookies_path}")
                         return True
-                    except Exception:
-                        logger.error("User said 'y' but we are not on the upload page.")
+                    except Exception as e:
+                        logger.error(f"User said 'y' but we are not on the upload page.{e}")
                         return False
                 else:
                     logger.warning(f"Login for {gmail} rejected or timed out.")
@@ -198,26 +198,16 @@ def upload_video_via_browser(
             public_radio.click()
 
             page.click("#done-button")
-            
-            # Wait for the confirmation dialog that the video is published.
-            page.wait_for_selector("ytcp-video-share-dialog", timeout=180000) # 3 minutes
-            logger.info("Upload completed and published!")
-            
-            # You might want to grab the video link here
-            video_link = page.locator("a.ytcp-video-info").get_attribute("href")
-            logger.info(f"Video published at: {video_link}")
-            
-            # Close the dialog
-            page.click("ytcp-button#close-button")
-
+            time.sleep(120)
+            logger.info("Upload completed!")
 
         except Exception as e:
             logger.error(f"Upload error: {e}")
             raise e
         finally:
             if not headless:
-                logger.info("Debug: Pausing for 15s before closing browser...")
-                time.sleep(15)
+                logger.info("Debug: Pausing for 5s before closing browser...")
+                time.sleep(5)
             browser.close()
 
 
@@ -227,13 +217,13 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "your_email@gmail.com")
-    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "your_password")
-    COOKIES_FILE = "youtube_cookies.json"
-    VIDEO_TO_UPLOAD = "path/to/your/video.mp4"
+    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "nikitadackov10@gmail.com")
+    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "94mabidu")
+    COOKIES_FILE = r"C:\Users\Sasha\PycharmProjects\youtube-automation\auth\My_test_channel.jsonn"
+    VIDEO_TO_UPLOAD = r"C:\Users\Sasha\PycharmProjects\youtube-automation\data\output\My_test_channel\1767679938\final.mp4"
     VIDEO_METADATA = {
-        "title": "My Awesome Automated Video",
-        "description": "This video was uploaded using Python and Playwright!\n#automation #python #youtube",
+        "title": "Психология, которая меняет мышление #shorts",
+        "description": "#shorts",
         "gmail": GMAIL_ACCOUNT,
         "password": GMAIL_PASSWORD,
     }
