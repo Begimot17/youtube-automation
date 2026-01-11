@@ -56,11 +56,16 @@ def migrate():
                         existing.mode = c_data.get("mode", existing.mode)
                         existing.gmail = c_data.get("gmail", existing.gmail)
                         existing.password = c_data.get("password", existing.password)
-                        existing.watch_folder = c_data.get("watch_folder", existing.watch_folder)
+                        existing.watch_folder = c_data.get(
+                            "watch_folder", existing.watch_folder
+                        )
                         existing.proxy = c_data.get("proxy", existing.proxy)
-                        existing.cookies_path = c_data.get("cookies_path", existing.cookies_path)
+                        existing.cookies_path = c_data.get(
+                            "cookies_path", existing.cookies_path
+                        )
                         existing.upload_frequency_per_day = c_data.get(
-                            "upload_frequency_per_day", existing.upload_frequency_per_day
+                            "upload_frequency_per_day",
+                            existing.upload_frequency_per_day,
                         )
                         existing.min_delay_seconds = c_data.get(
                             "min_delay_seconds", existing.min_delay_seconds
@@ -68,11 +73,16 @@ def migrate():
                         existing.quality = c_data.get("quality", existing.quality)
                         existing.lang = c_data.get("lang", existing.lang)
                         existing.voice = c_data.get("voice", existing.voice)
-                        existing.description = c_data.get("description", existing.description)
-                        existing.tiktok_sources = c_data.get("tiktok_sources", existing.tiktok_sources)
-                        existing.genai_topics = c_data.get("genai_topics", existing.genai_topics)
+                        existing.description = c_data.get(
+                            "description", existing.description
+                        )
+                        existing.tiktok_sources = c_data.get(
+                            "tiktok_sources", existing.tiktok_sources
+                        )
+                        existing.genai_topics = c_data.get(
+                            "genai_topics", existing.genai_topics
+                        )
                         print(f"Updating existing channel: {c_data['channel_name']}")
-
 
         db.commit()
 

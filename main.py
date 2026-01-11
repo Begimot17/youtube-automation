@@ -133,7 +133,9 @@ async def process_tiktok_channel(channel, downloader, db):
                     if not is_logged_in:
                         msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
                         send_telegram_message(msg)
-                        logger.error(f"Login failed for {channel.channel_name}. Skipping.")
+                        logger.error(
+                            f"Login failed for {channel.channel_name}. Skipping."
+                        )
                         return
                     await asyncio.to_thread(
                         upload_video_via_browser,

@@ -1,7 +1,6 @@
 import html
 import json
 import logging
-import os
 
 import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
