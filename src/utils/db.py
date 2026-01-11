@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
 
-from alembic import command
-from alembic.config import Config as AlembicConfig
 from sqlalchemy import (
     JSON,
     Column,
@@ -10,11 +8,14 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     create_engine,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
+from alembic import command
+from alembic.config import Config as AlembicConfig
 from src.config import Config
 
 logger = logging.getLogger("db")
@@ -46,14 +47,13 @@ class Channel(Base):
     __tablename__ = "channels"
 
     id = Column(Integer, primary_key=True, index=True)
-    channel_name = Column(String(100), unique=True, index=True)
-    account_name = Column(String(100))
+    channel_name = Column(String(100), index=True)
+    account_name = Column(String(100), index=True)
     mode = Column(String(20), default="tiktok")  # 'tiktok' or 'genai'
     gmail = Column(String(100))
     password = Column(String(100))
     watch_folder = Column(String(255))
     proxy = Column(String(255))
-    cookies_path = Column(String(255))
     upload_frequency_per_day = Column(Integer, default=1)
     min_delay_seconds = Column(Integer, default=3600)
     quality = Column(String(20), default="easy")
@@ -68,6 +68,10 @@ class Channel(Base):
 
     uploads = relationship(
         "UploadHistory", back_populates="channel", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("account_name", "channel_name", name="_account_channel_uc"),
     )
 
 

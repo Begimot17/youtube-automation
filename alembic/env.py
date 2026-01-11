@@ -1,6 +1,5 @@
 import os
 import sys
-from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy.pool import NullPool
@@ -18,8 +17,8 @@ config = context.config
 # Add project root to sys.path to find models
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.utils.db import Base, DATABASE_URL
 from src.config import Config
+from src.utils.db import Base
 
 # Set the database URL from your application's config
 config.set_main_option("sqlalchemy.url", Config.DATABASE_URL)

@@ -69,7 +69,12 @@ def list_channels():
     db = SessionLocal()
     try:
         channels = db.query(Channel).all()
-        return jsonify([c.channel_name for c in channels])
+        return jsonify(
+            [
+                {"account_name": c.account_name, "channel_name": c.channel_name}
+                for c in channels
+            ]
+        )
     finally:
         db.close()
 
@@ -169,7 +174,7 @@ def get_stats():
         history = db.query(UploadHistory).all()
         result = {}
         for h in history:
-            c_name = h.channel.channel_name
+            c_name = f"{h.channel.account_name}/{h.channel.channel_name}"
             if c_name not in result:
                 result[c_name] = []
             result[c_name].append(
@@ -182,12 +187,24 @@ def get_stats():
         db.close()
 
 
-@app.route("/channel/<string:name>", methods=["GET"])
-def get_channel(name):
+@app.route("/channel", methods=["GET"])
+def get_channel():
     """Returns details for a single channel."""
+    account_name = request.args.get("account_name")
+    channel_name = request.args.get("channel_name")
+    if not account_name or not channel_name:
+        return jsonify({"error": "account_name and channel_name are required"}), 400
+
     db = SessionLocal()
     try:
-        c = db.query(Channel).filter(Channel.channel_name == name).first()
+        c = (
+            db.query(Channel)
+            .filter(
+                Channel.account_name == account_name,
+                Channel.channel_name == channel_name,
+            )
+            .first()
+        )
         if not c:
             return jsonify({"error": "Channel not found"}), 404
         return jsonify(
@@ -199,7 +216,6 @@ def get_channel(name):
                 "password": "******",
                 "watch_folder": c.watch_folder,
                 "proxy": c.proxy,
-                "cookies_path": c.cookies_path,
                 "upload_frequency_per_day": c.upload_frequency_per_day,
                 "min_delay_seconds": c.min_delay_seconds,
                 "quality": c.quality,
@@ -219,28 +235,32 @@ def create_channel():
     db = SessionLocal()
     try:
         data = request.json
-        if not data or "channel_name" not in data:
-            return jsonify({"error": "channel_name is required"}), 400
+        if not data or "channel_name" not in data or "account_name" not in data:
+            return jsonify({"error": "account_name and channel_name are required"}), 400
 
         existing = (
             db.query(Channel)
-            .filter(Channel.channel_name == data["channel_name"])
+            .filter(
+                Channel.account_name == data["account_name"],
+                Channel.channel_name == data["channel_name"],
+            )
             .first()
         )
         if existing:
-            return jsonify({"error": "Channel already exists"}), 409
+            return jsonify(
+                {
+                    "error": "Channel with this account_name and channel_name already exists"
+                }
+            ), 409
 
         channel = Channel(
             channel_name=data["channel_name"],
-            account_name=data.get("account_name", data["channel_name"]),
+            account_name=data["account_name"],
             mode=data.get("mode", "genai"),
             gmail=data.get("gmail", ""),
             password=data.get("password", ""),
             watch_folder=data.get("watch_folder", "data/tiktok_downloads"),
             proxy=data.get("proxy", ""),
-            cookies_path=data.get(
-                "cookies_path", f"auth/cookies_{data['channel_name']}.json"
-            ),
             upload_frequency_per_day=data.get("upload_frequency_per_day", 1),
             min_delay_seconds=data.get("min_delay_seconds", 3600),
             quality=data.get("quality", "easy"),
@@ -252,7 +272,11 @@ def create_channel():
         db.add(channel)
         db.commit()
         return jsonify(
-            {"status": "Channel created", "channel": data["channel_name"]}
+            {
+                "status": "Channel created",
+                "account_name": data["account_name"],
+                "channel_name": data["channel_name"],
+            }
         ), 201
     except Exception as e:
         db.rollback()
@@ -261,18 +285,36 @@ def create_channel():
         db.close()
 
 
-@app.route("/channel/<string:name>", methods=["DELETE"])
-def delete_channel(name):
+@app.route("/channel", methods=["DELETE"])
+def delete_channel():
     """Deletes a channel."""
+    account_name = request.args.get("account_name")
+    channel_name = request.args.get("channel_name")
+    if not account_name or not channel_name:
+        return jsonify({"error": "account_name and channel_name are required"}), 400
+
     db = SessionLocal()
     try:
-        channel = db.query(Channel).filter(Channel.channel_name == name).first()
+        channel = (
+            db.query(Channel)
+            .filter(
+                Channel.account_name == account_name,
+                Channel.channel_name == channel_name,
+            )
+            .first()
+        )
         if not channel:
             return jsonify({"error": "Channel not found"}), 404
 
         db.delete(channel)
         db.commit()
-        return jsonify({"status": "Channel deleted", "channel": name})
+        return jsonify(
+            {
+                "status": "Channel deleted",
+                "account_name": account_name,
+                "channel_name": channel_name,
+            }
+        )
     except Exception as e:
         db.rollback()
         return jsonify({"error": str(e)}), 500
@@ -293,16 +335,25 @@ def manage_config():
                 ), 400
 
             for c_data in new_config:
+                account_name = c_data.get("account_name")
+                channel_name = c_data.get("channel_name")
+                if not account_name or not channel_name:
+                    continue
+
                 channel = (
                     db.query(Channel)
-                    .filter(Channel.channel_name == c_data["channel_name"])
+                    .filter(
+                        Channel.account_name == account_name,
+                        Channel.channel_name == channel_name,
+                    )
                     .first()
                 )
                 if not channel:
-                    channel = Channel(channel_name=c_data["channel_name"])
+                    channel = Channel(
+                        account_name=account_name, channel_name=channel_name
+                    )
                     db.add(channel)
 
-                channel.account_name = c_data.get("account_name", channel.account_name or c_data["channel_name"])
                 channel.mode = c_data.get("mode", channel.mode)
                 if "gmail" in c_data:
                     channel.gmail = c_data["gmail"]
@@ -310,7 +361,6 @@ def manage_config():
                     channel.password = c_data["password"]
                 channel.watch_folder = c_data.get("watch_folder", channel.watch_folder)
                 channel.proxy = c_data.get("proxy", channel.proxy)
-                channel.cookies_path = c_data.get("cookies_path", channel.cookies_path)
                 channel.upload_frequency_per_day = c_data.get(
                     "upload_frequency_per_day", channel.upload_frequency_per_day
                 )
@@ -340,7 +390,6 @@ def manage_config():
                     "password": "******",
                     "watch_folder": c.watch_folder,
                     "proxy": c.proxy,
-                    "cookies_path": c.cookies_path,
                     "upload_frequency_per_day": c.upload_frequency_per_day,
                     "min_delay_seconds": c.min_delay_seconds,
                     "quality": c.quality,
@@ -367,11 +416,21 @@ def run_all():
         return jsonify({"error": "A task is already running."}), 429
 
 
-@app.route("/run/channel/<string:channel_name>", methods=["POST"])
-def run_channel(channel_name):
+@app.route("/run/channel", methods=["POST"])
+def run_channel_route():
     """Triggers automation for a specific channel."""
-    if start_async_task(run_for_channel(channel_name), f"Channel Run: {channel_name}"):
-        return jsonify({"status": f"Job for {channel_name} started in background."})
+    account_name = request.args.get("account_name")
+    channel_name = request.args.get("channel_name")
+    if not account_name or not channel_name:
+        return jsonify({"error": "account_name and channel_name are required"}), 400
+
+    if start_async_task(
+        run_for_channel(account_name, channel_name),
+        f"Channel Run: {account_name}/{channel_name}",
+    ):
+        return jsonify(
+            {"status": f"Job for {account_name}/{channel_name} started in background."}
+        )
     else:
         return jsonify({"error": "A task is already running."}), 429
 
@@ -393,19 +452,27 @@ def get_logs():
 @app.route("/history/reset", methods=["POST"])
 def reset_history():
     """Clears history for a specific channel or all channels in DB."""
-    channel_name = request.args.get("channel")
+    account_name = request.args.get("account_name")
+    channel_name = request.args.get("channel_name")
     db = SessionLocal()
     try:
-        if channel_name:
+        if account_name and channel_name:
             channel = (
-                db.query(Channel).filter(Channel.channel_name == channel_name).first()
+                db.query(Channel)
+                .filter(
+                    Channel.account_name == account_name,
+                    Channel.channel_name == channel_name,
+                )
+                .first()
             )
             if channel:
                 db.query(UploadHistory).filter(
                     UploadHistory.channel_id == channel.id
                 ).delete()
                 db.commit()
-                return jsonify({"status": f"History cleared for {channel_name}"})
+                return jsonify(
+                    {"status": f"History cleared for {account_name}/{channel_name}"}
+                )
             return jsonify({"error": "Channel not found"}), 404
         else:
             db.query(UploadHistory).delete()

@@ -22,22 +22,28 @@ def migrate():
             with open(Config.CHANNELS_CONFIG_PATH, "r", encoding="utf-8") as f:
                 channels_data = json.load(f)
                 for c_data in channels_data:
+                    account_name = c_data.get("account_name", c_data["channel_name"])
+                    channel_name = c_data["channel_name"]
+
                     existing = (
                         db.query(Channel)
-                        .filter(Channel.channel_name == c_data["channel_name"])
+                        .filter(
+                            Channel.account_name == account_name,
+                            Channel.channel_name == channel_name,
+                        )
                         .first()
                     )
                     schedule_data = c_data.get("schedule", ["08:00-20:00"])
 
                     if not existing:
                         channel = Channel(
-                            channel_name=c_data["channel_name"],
+                            channel_name=channel_name,
+                            account_name=account_name,
                             mode=c_data.get("mode", "tiktok"),
                             gmail=c_data.get("gmail"),
                             password=c_data.get("password"),
                             watch_folder=c_data.get("watch_folder"),
                             proxy=c_data.get("proxy"),
-                            cookies_path=c_data.get("cookies_path"),
                             upload_frequency_per_day=c_data.get(
                                 "upload_frequency_per_day", 1
                             ),
@@ -51,7 +57,7 @@ def migrate():
                             genai_topics=c_data.get("genai_topics", []),
                         )
                         db.add(channel)
-                        print(f"Creating new channel: {c_data['channel_name']}")
+                        print(f"Creating new channel: {account_name}/{channel_name}")
                     else:
                         # Update existing channel
                         existing.mode = c_data.get("mode", existing.mode)
@@ -61,9 +67,6 @@ def migrate():
                             "watch_folder", existing.watch_folder
                         )
                         existing.proxy = c_data.get("proxy", existing.proxy)
-                        existing.cookies_path = c_data.get(
-                            "cookies_path", existing.cookies_path
-                        )
                         existing.upload_frequency_per_day = c_data.get(
                             "upload_frequency_per_day",
                             existing.upload_frequency_per_day,
@@ -84,7 +87,9 @@ def migrate():
                         existing.genai_topics = c_data.get(
                             "genai_topics", existing.genai_topics
                         )
-                        print(f"Updating existing channel: {c_data['channel_name']}")
+                        print(
+                            f"Updating existing channel: {account_name}/{channel_name}"
+                        )
 
         db.commit()
 
@@ -93,6 +98,8 @@ def migrate():
             with open(Config.UPLOAD_HISTORY_PATH, "r", encoding="utf-8") as f:
                 history_data = json.load(f)
                 for channel_name, uploads in history_data.items():
+                    # This part is tricky as we don't have account_name in old history.
+                    # We'll assume the first channel found with that name is the correct one.
                     channel = (
                         db.query(Channel)
                         .filter(Channel.channel_name == channel_name)

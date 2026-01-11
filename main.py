@@ -82,7 +82,7 @@ def is_within_schedule(channel):
                 return True
         except ValueError:
             logger.warning(
-                f"Invalid schedule format for {channel.channel_name}: {time_range}"
+                f"Invalid schedule format for {channel.account_name}/{channel.channel_name}: {time_range}"
             )
             continue
     return False
@@ -91,7 +91,7 @@ def is_within_schedule(channel):
 def can_upload(channel, db):
     if not is_within_schedule(channel):
         logger.info(
-            f"Skipping {channel.channel_name}: Outside of scheduled upload time."
+            f"Skipping {channel.account_name}/{channel.channel_name}: Outside of scheduled upload time."
         )
         return False
 
@@ -101,7 +101,7 @@ def can_upload(channel, db):
     recent_uploads = get_channel_uploads_last_24h(db, channel.id)
     if len(recent_uploads) >= freq:
         logger.info(
-            f"Skipping {channel.channel_name}: Daily limit reached ({len(recent_uploads)}/{freq})"
+            f"Skipping {channel.account_name}/{channel.channel_name}: Daily limit reached ({len(recent_uploads)}/{freq})"
         )
         return False
 
@@ -110,7 +110,7 @@ def can_upload(channel, db):
     if now - last_time < min_delay:
         remaining = int(min_delay - (now - last_time))
         logger.info(
-            f"Skipping {channel.channel_name}: Minimum delay active. Wait {remaining}s"
+            f"Skipping {channel.account_name}/{channel.channel_name}: Minimum delay active. Wait {remaining}s"
         )
         return False
 
@@ -123,11 +123,12 @@ async def process_tiktok_channel(channel, downloader, db):
 
     tiktok_sources = channel.tiktok_sources or []
     watch_folder = channel.watch_folder or "data/tiktok_downloads"
-    cookies = channel.cookies_path
     proxy = channel.proxy
-    account_name = channel.account_name
+    account_name = channel.account_name or channel.channel_name
 
-    logger.info(f"--- Processing TikTok Channel: {channel.channel_name} ---")
+    logger.info(
+        f"--- Processing TikTok Channel: {account_name}/{channel.channel_name} ---"
+    )
 
     for tt_user in tiktok_sources:
         videos = await downloader.get_user_videos(tt_user, count=TIKTOK_DOWNLOAD_COUNT)
@@ -150,21 +151,21 @@ async def process_tiktok_channel(channel, downloader, db):
                     "description": channel.description or "#shorts #tiktok",
                     "gmail": channel.gmail,
                     "password": channel.password,
+                    "channel_name": channel.channel_name,
                 }
                 try:
                     is_logged_in = await asyncio.to_thread(
                         verify_login_status,
                         gmail=channel.gmail,
                         password=channel.password,
-                        cookies_path=cookies,
                         headless=False,
                         account_name=account_name,
                     )
                     if not is_logged_in:
-                        msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
+                        msg = f"⚠️ <b>[LOGIN FAILED]</b> Account: <code>{account_name}</code>\nCould not verify login status."
                         send_telegram_message(msg)
                         logger.error(
-                            f"Login failed for {channel.channel_name}. Skipping."
+                            f"Login failed for {account_name}/{channel.channel_name}. Skipping."
                         )
                         return
                     await asyncio.to_thread(
@@ -172,49 +173,58 @@ async def process_tiktok_channel(channel, downloader, db):
                         video_path=os.path.abspath(output_path),
                         metadata=metadata,
                         proxy=proxy,
-                        cookies_path=cookies,
                         headless=False,
                         account_name=account_name,
                     )
                     mark_item_processed(db, channel.id, video_id)
 
-                    send_upload_report(channel.channel_name, title, status="Success")
+                    send_upload_report(
+                        account_name, channel.channel_name, title, status="Success"
+                    )
                     return  # Respect delay
                 except Exception as e:
                     send_upload_report(
-                        channel.channel_name, title, status="Failed", error_msg=str(e)
+                        account_name,
+                        channel.channel_name,
+                        title,
+                        status="Failed",
+                        error_msg=str(e),
                     )
-                    logger.error(f"TikTok upload failed: {e}")
+                    logger.error(
+                        f"TikTok upload failed for {account_name}/{channel.channel_name}: {e}"
+                    )
 
 
 async def process_genai_channel(channel, db):
     if not can_upload(channel, db):
         return
 
-    account_name = channel.account_name
+    account_name = channel.account_name or channel.channel_name
     # Pre-check login
     is_logged_in = await asyncio.to_thread(
         verify_login_status,
         gmail=channel.gmail,
         password=channel.password,
-        cookies_path=channel.cookies_path,
         headless=False,
         account_name=account_name,
     )
     if not is_logged_in:
-        msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
+        msg = f"⚠️ <b>[LOGIN FAILED]</b> Account: <code>{account_name}</code>\nCould not verify login status."
         send_telegram_message(msg)
-        logger.error(f"Login failed for {channel.channel_name}. Skipping.")
+        logger.error(
+            f"Login failed for {account_name}/{channel.channel_name}. Skipping."
+        )
         return
 
     topics = channel.genai_topics or []
     lang = channel.lang or "ru"
     quality = channel.quality or "easy"
     voice = channel.voice
-    cookies = channel.cookies_path
     proxy = channel.proxy
 
-    logger.info(f"--- Processing GenAI Channel: {channel.channel_name} ---")
+    logger.info(
+        f"--- Processing GenAI Channel: {account_name}/{channel.channel_name} ---"
+    )
     if not topics:
         return
 
@@ -231,7 +241,9 @@ async def process_genai_channel(channel, db):
             break
 
     if not topic:
-        logger.info(f"All GenAI topics for {channel.channel_name} have been processed.")
+        logger.info(
+            f"All GenAI topics for {account_name}/{channel.channel_name} have been processed."
+        )
         return
 
     try:
@@ -250,6 +262,7 @@ async def process_genai_channel(channel, db):
                 "description": channel.description or "#shorts #tiktok",
                 "gmail": channel.gmail,
                 "password": channel.password,
+                "channel_name": channel.channel_name,
             }
             try:
                 await asyncio.to_thread(
@@ -257,19 +270,26 @@ async def process_genai_channel(channel, db):
                     video_path=os.path.abspath(video_path),
                     metadata=metadata,
                     proxy=proxy,
-                    cookies_path=cookies,
                     headless=False,
                     account_name=account_name,
                 )
                 mark_item_processed(db, channel.id, item_id)
-                send_upload_report(channel.channel_name, title, status="Success")
+                send_upload_report(
+                    account_name, channel.channel_name, title, status="Success"
+                )
             except Exception as e:
                 send_upload_report(
-                    channel.channel_name, title, status="Failed", error_msg=str(e)
+                    account_name,
+                    channel.channel_name,
+                    title,
+                    status="Failed",
+                    error_msg=str(e),
                 )
-                logger.error(f"Upload failed: {e}")
+                logger.error(
+                    f"Upload failed for {account_name}/{channel.channel_name}: {e}"
+                )
     except Exception as e:
-        logger.error(f"GenAI failed: {e}")
+        logger.error(f"GenAI failed for {account_name}/{channel.channel_name}: {e}")
 
 
 async def run_full_cycle():
@@ -291,16 +311,23 @@ async def run_full_cycle():
     logger.info("Cycle finished.")
 
 
-async def run_for_channel(channel_name):
+async def run_for_channel(account_name, channel_name):
     """Runs automation for a specific channel name."""
-    logger.info(f"Triggering manual run for channel: {channel_name}")
+    logger.info(f"Triggering manual run for channel: {account_name}/{channel_name}")
     db = SessionLocal()
     downloader = TikTokDownloader()
 
     try:
-        target = db.query(Channel).filter(Channel.channel_name == channel_name).first()
+        target = (
+            db.query(Channel)
+            .filter(
+                Channel.account_name == account_name,
+                Channel.channel_name == channel_name,
+            )
+            .first()
+        )
         if not target:
-            logger.error(f"Channel {channel_name} not found in DB.")
+            logger.error(f"Channel {account_name}/{channel_name} not found in DB.")
             return False
 
         mode = (target.mode or "tiktok").lower()

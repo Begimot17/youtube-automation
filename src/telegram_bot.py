@@ -47,9 +47,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Get engine status\n"
         "/channels - Manage channels (List / Run / Delete)\n"
         "/generate &lt;topic&gt; [en|ru] - Generate video & send to chat\n"
-        "/run <i>name</i> - Trigger specific channel\n"
+        "/run <i>account_name</i> <i>channel_name</i> - Trigger specific channel\n"
         "/add_channel <i>json</i> - Add new channel configuration\n"
-        "/del_channel <i>name</i> - Remove channel from system\n"
+        "/del_channel <i>account_name</i> <i>channel_name</i> - Remove channel from system\n"
         "/run_all - Trigger all channels automation\n"
         "/cleanup - Perform disk cleanup\n"
         "/logs - Get last 50 log lines\n"
@@ -90,16 +90,24 @@ async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_html("📺 <b>Configured Channels:</b>")
 
-        for name in channels:
+        for channel in channels:
+            account_name = channel["account_name"]
+            channel_name = channel["channel_name"]
             keyboard = [
                 [
-                    InlineKeyboardButton("🚀 Run", callback_data=f"run:{name}"),
-                    InlineKeyboardButton("🗑 Delete", callback_data=f"del:{name}"),
+                    InlineKeyboardButton(
+                        "🚀 Run", callback_data=f"run:{account_name}:{channel_name}"
+                    ),
+                    InlineKeyboardButton(
+                        "🗑 Delete", callback_data=f"del:{account_name}:{channel_name}"
+                    ),
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
-                f"🔹 <b>{name}</b>", reply_markup=reply_markup, parse_mode="HTML"
+                f"🔹 <b>{account_name}/{channel_name}</b>",
+                reply_markup=reply_markup,
+                parse_mode="HTML",
             )
 
     except Exception as e:
@@ -113,20 +121,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data
-    action, name = data.split(":", 1)
+    action, account_name, channel_name = data.split(":", 2)
 
     if action == "run":
         try:
-            response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=15)
+            response = requests.post(
+                f"{API_BASE_URL}/run/channel?account_name={account_name}&channel_name={channel_name}",
+                timeout=15,
+            )
             if response.status_code == 200:
                 await query.edit_message_text(
-                    f"🚀 <b>{html.escape(name)}</b>: Started successfully!",
+                    f"🚀 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Started successfully!",
                     parse_mode="HTML",
                 )
             else:
                 err = response.json().get("error", "Unknown error")
                 await query.edit_message_text(
-                    f"⚠️ <b>{html.escape(name)}</b>: Failed to start ({html.escape(err)})",
+                    f"⚠️ <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Failed to start ({html.escape(err)})",
                     parse_mode="HTML",
                 )
         except Exception as e:
@@ -134,15 +145,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "del":
         try:
-            response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=15)
+            response = requests.delete(
+                f"{API_BASE_URL}/channel?account_name={account_name}&channel_name={channel_name}",
+                timeout=15,
+            )
             if response.status_code == 200:
                 await query.edit_message_text(
-                    f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!",
+                    f"🗑 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Deleted successfully!",
                     parse_mode="HTML",
                 )
             else:
                 await query.edit_message_text(
-                    f"⚠️ <b>{html.escape(name)}</b>: Failed to delete", parse_mode="HTML"
+                    f"⚠️ <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Failed to delete",
+                    parse_mode="HTML",
                 )
         except Exception as e:
             await query.edit_message_text(f"❌ Error: {html.escape(str(e))}")
@@ -151,21 +166,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Triggers a run for a specific channel."""
-    if not context.args:
-        await update.message.reply_text("Usage: /run <channel_name>")
+    if len(context.args) != 2:
+        await update.message.reply_text("Usage: /run <account_name> <channel_name>")
         return
 
-    name = context.args[0]
+    account_name, channel_name = context.args
     try:
-        response = requests.post(f"{API_BASE_URL}/run/channel/{name}", timeout=15)
+        response = requests.post(
+            f"{API_BASE_URL}/run/channel?account_name={account_name}&channel_name={channel_name}",
+            timeout=15,
+        )
         if response.status_code == 200:
             await update.message.reply_html(
-                f"🚀 <b>{html.escape(name)}</b>: Started successfully!"
+                f"🚀 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Started successfully!"
             )
         else:
             err = response.json().get("error", "Unknown error")
             await update.message.reply_html(
-                f"⚠️ <b>{html.escape(name)}</b>: {html.escape(err)}"
+                f"⚠️ <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: {html.escape(err)}"
             )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {html.escape(str(e))}")
@@ -176,7 +194,7 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Adds a new channel via JSON."""
     if not context.args:
         await update.message.reply_text(
-            'Usage: /add_channel {"channel_name": "...", ...}'
+            'Usage: /add_channel {"account_name": "...", "channel_name": "...", ...}'
         )
         return
 
@@ -186,7 +204,7 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         response = requests.post(f"{API_BASE_URL}/channel", json=data, timeout=15)
         if response.status_code == 201:
             await update.message.reply_html(
-                f"✅ <b>{html.escape(data['channel_name'])}</b>: Created successfully!"
+                f"✅ <b>{html.escape(data['account_name'])}/{html.escape(data['channel_name'])}</b>: Created successfully!"
             )
         else:
             err = response.json().get("error", "Unknown error")
@@ -200,20 +218,25 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 @restricted
 async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Deletes a specific channel."""
-    if not context.args:
-        await update.message.reply_text("Usage: /del_channel <channel_name>")
+    if len(context.args) != 2:
+        await update.message.reply_text(
+            "Usage: /del_channel <account_name> <channel_name>"
+        )
         return
 
-    name = context.args[0]
+    account_name, channel_name = context.args
     try:
-        response = requests.delete(f"{API_BASE_URL}/channel/{name}", timeout=15)
+        response = requests.delete(
+            f"{API_BASE_URL}/channel?account_name={account_name}&channel_name={channel_name}",
+            timeout=15,
+        )
         if response.status_code == 200:
             await update.message.reply_html(
-                f"🗑 <b>{html.escape(name)}</b>: Deleted successfully!"
+                f"🗑 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Deleted successfully!"
             )
         else:
             await update.message.reply_html(
-                f"⚠️ Failed to delete <b>{html.escape(name)}</b>."
+                f"⚠️ Failed to delete <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>."
             )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {html.escape(str(e))}")

@@ -33,14 +33,18 @@ def send_telegram_message(message, parse_mode="HTML"):
         return False
 
 
-def send_upload_report(channel_name, title, status="Success", error_msg=None):
+def send_upload_report(
+    account_name, channel_name, title, status="Success", error_msg=None
+):
     """
     Sends a formatted upload report to Telegram.
     """
+    safe_account = html.escape(account_name)
     safe_channel = html.escape(channel_name)
     safe_title = html.escape(title)
     emoji = "✅" if status == "Success" else "❌"
     message = f"<b>{emoji} YouTube Upload Report</b>\n\n"
+    message += f"<b>Account:</b> {safe_account}\n"
     message += f"<b>Channel:</b> {safe_channel}\n"
     message += f"<b>Title:</b> {safe_title}\n"
     message += f"<b>Status:</b> {status}\n"
