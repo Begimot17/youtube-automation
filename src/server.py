@@ -193,6 +193,7 @@ def get_channel(name):
         return jsonify(
             {
                 "channel_name": c.channel_name,
+                "account_name": c.account_name,
                 "mode": c.mode,
                 "gmail": c.gmail,
                 "password": "******",
@@ -231,6 +232,7 @@ def create_channel():
 
         channel = Channel(
             channel_name=data["channel_name"],
+            account_name=data.get("account_name", data["channel_name"]),
             mode=data.get("mode", "genai"),
             gmail=data.get("gmail", ""),
             password=data.get("password", ""),
@@ -300,6 +302,7 @@ def manage_config():
                     channel = Channel(channel_name=c_data["channel_name"])
                     db.add(channel)
 
+                channel.account_name = c_data.get("account_name", channel.account_name or c_data["channel_name"])
                 channel.mode = c_data.get("mode", channel.mode)
                 if "gmail" in c_data:
                     channel.gmail = c_data["gmail"]
@@ -331,6 +334,7 @@ def manage_config():
             safe_config.append(
                 {
                     "channel_name": c.channel_name,
+                    "account_name": c.account_name,
                     "mode": c.mode,
                     "gmail": c.gmail,
                     "password": "******",

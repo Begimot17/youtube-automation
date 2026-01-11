@@ -29,12 +29,13 @@ def input_with_timeout(prompt, timeout):
     return result[0]
 
 
-def verify_login_status(gmail, password, cookies_path, proxy=None, headless=False):
+def verify_login_status(gmail, password, cookies_path, proxy=None, headless=False, account_name=None):
     """
     Checks if we are logged into YouTube. If not, attempts automatic login.
     If it requires manual intervention (2FA, etc), opens browser and asks user.
     """
-    logger.info(f"Verifying login status for {gmail}...")
+    effective_cookies_path = f"auth/{account_name}.json" if account_name else cookies_path
+    logger.info(f"Verifying login status for {gmail} using cookies at {effective_cookies_path}...")
 
     with sync_playwright() as p:
         browser_args = ["--disable-blink-features=AutomationControlled"]
@@ -44,8 +45,8 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
             "viewport": {"width": 1280, "height": 720},
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
-        if cookies_path and os.path.exists(cookies_path):
-            context_options["storage_state"] = cookies_path
+        if effective_cookies_path and os.path.exists(effective_cookies_path):
+            context_options["storage_state"] = effective_cookies_path
 
         context = browser.new_context(**context_options)
         page = context.new_page()
@@ -87,12 +88,12 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
                         # Increased timeout
                         page.wait_for_url("**/upload**", timeout=60000)
                         logger.info("Login confirmed by user.")
-                        if cookies_path:
-                            context.storage_state(path=cookies_path)
-                            logger.info(f"Saved fresh cookies to {cookies_path}")
+                        if effective_cookies_path:
+                            context.storage_state(path=effective_cookies_path)
+                            logger.info(f"Saved fresh cookies to {effective_cookies_path}")
                         return True
-                    except Exception as e:
-                        logger.error(f"User said 'y' but we are not on the upload page.{e}")
+                    except Exception:
+                        logger.error("User said 'y' but we are not on the upload page.")
                         return False
                 else:
                     logger.warning(f"Login for {gmail} rejected or timed out.")
@@ -112,12 +113,13 @@ def verify_login_status(gmail, password, cookies_path, proxy=None, headless=Fals
 
 
 def upload_video_via_browser(
-    video_path, metadata, proxy=None, cookies_path=None, headless=False
+    video_path, metadata, proxy=None, cookies_path=None, headless=False, account_name=None
 ):
     """
     Uploads a video to YouTube using Playwright.
     """
-    logger.info(f"Uploading: {video_path}")
+    effective_cookies_path = f"auth/{account_name}.json" if account_name else cookies_path
+    logger.info(f"Uploading: {video_path} using cookies at {effective_cookies_path}")
 
     with sync_playwright() as p:
         browser_args = ["--disable-blink-features=AutomationControlled"]
@@ -127,8 +129,8 @@ def upload_video_via_browser(
             "viewport": {"width": 1280, "height": 720},
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
-        if cookies_path and os.path.exists(cookies_path):
-            context_options["storage_state"] = cookies_path
+        if effective_cookies_path and os.path.exists(effective_cookies_path):
+            context_options["storage_state"] = effective_cookies_path
 
         context = browser.new_context(**context_options)
         page = context.new_page()
@@ -151,8 +153,8 @@ def upload_video_via_browser(
                     page.click("#passwordNext")
                     # Increased timeout
                     page.wait_for_url("**/upload**", timeout=240000)
-                    if cookies_path:
-                        context.storage_state(path=cookies_path)
+                    if effective_cookies_path:
+                        context.storage_state(path=effective_cookies_path)
 
             # 2. Select file
             logger.info("Selecting file...")
@@ -217,13 +219,13 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "nikitadackov10@gmail.com")
-    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "94mabidu")
-    COOKIES_FILE = r"C:\Users\Sasha\PycharmProjects\youtube-automation\auth\My_test_channel.jsonn"
-    VIDEO_TO_UPLOAD = r"C:\Users\Sasha\PycharmProjects\youtube-automation\data\output\My_test_channel\1767679938\final.mp4"
+    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "your_email@gmail.com")
+    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "your_password")
+    COOKIES_FILE = "youtube_cookies.json"
+    VIDEO_TO_UPLOAD = "path/to/your/video.mp4"
     VIDEO_METADATA = {
-        "title": "Психология, которая меняет мышление #shorts",
-        "description": "#shorts",
+        "title": "My Awesome Automated Video",
+        "description": "This video was uploaded using Python and Playwright!\n#automation #python #youtube",
         "gmail": GMAIL_ACCOUNT,
         "password": GMAIL_PASSWORD,
     }

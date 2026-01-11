@@ -1,6 +1,7 @@
 [
     {
         "channel_name": "Sugarfilip75",
+        "account_name": "Sugarfilip75",
         "mode": "tiktok",
         "gmail": "Sugarfilip75@gmail.com",
         "password": "***",
@@ -20,12 +21,13 @@
     },
     {
         "channel_name": "GenAI_Facts_RU",
+        "account_name": "GenAI_Facts",
         "mode": "genai",
         "gmail": "tggh1081@gmail.com",
         "password": "***",
         "watch_folder": "data/GenAI_Facts_RU",
         "proxy": "",
-        "cookies_path": "auth/GenAI_Facts_RU.json",
+        "cookies_path": "auth/GenAI_Facts.json",
         "upload_frequency_per_day": 1,
         "min_delay_seconds": 7200,
         "lang": "ru",
@@ -42,12 +44,13 @@
     },
     {
         "channel_name": "GenAI_Facts_EN",
+        "account_name": "GenAI_Facts",
         "mode": "genai",
         "gmail": "hjh22505@gmail.com",
         "password": "***",
         "watch_folder": "data/GenAI_Facts_EN",
         "proxy": "",
-        "cookies_path": "auth/GenAI_Facts_EN.json",
+        "cookies_path": "auth/GenAI_Facts.json",
         "upload_frequency_per_day": 1,
         "min_delay_seconds": 7200,
         "lang": "en",

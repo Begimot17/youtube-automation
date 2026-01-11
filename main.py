@@ -125,6 +125,7 @@ async def process_tiktok_channel(channel, downloader, db):
     watch_folder = channel.watch_folder or "data/tiktok_downloads"
     cookies = channel.cookies_path
     proxy = channel.proxy
+    account_name = channel.account_name
 
     logger.info(f"--- Processing TikTok Channel: {channel.channel_name} ---")
 
@@ -155,8 +156,9 @@ async def process_tiktok_channel(channel, downloader, db):
                         verify_login_status,
                         gmail=channel.gmail,
                         password=channel.password,
-                        cookies_path=channel.cookies_path,
+                        cookies_path=cookies,
                         headless=False,
+                        account_name=account_name,
                     )
                     if not is_logged_in:
                         msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
@@ -172,6 +174,7 @@ async def process_tiktok_channel(channel, downloader, db):
                         proxy=proxy,
                         cookies_path=cookies,
                         headless=False,
+                        account_name=account_name,
                     )
                     mark_item_processed(db, channel.id, video_id)
 
@@ -188,6 +191,7 @@ async def process_genai_channel(channel, db):
     if not can_upload(channel, db):
         return
 
+    account_name = channel.account_name
     # Pre-check login
     is_logged_in = await asyncio.to_thread(
         verify_login_status,
@@ -195,6 +199,7 @@ async def process_genai_channel(channel, db):
         password=channel.password,
         cookies_path=channel.cookies_path,
         headless=False,
+        account_name=account_name,
     )
     if not is_logged_in:
         msg = f"⚠️ <b>[LOGIN FAILED]</b> Channel: <code>{channel.channel_name}</code>\nCould not verify login status."
@@ -254,6 +259,7 @@ async def process_genai_channel(channel, db):
                     proxy=proxy,
                     cookies_path=cookies,
                     headless=False,
+                    account_name=account_name,
                 )
                 mark_item_processed(db, channel.id, item_id)
                 send_upload_report(channel.channel_name, title, status="Success")

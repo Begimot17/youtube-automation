@@ -47,6 +47,7 @@ class Channel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     channel_name = Column(String(100), unique=True, index=True)
+    account_name = Column(String(100))
     mode = Column(String(20), default="tiktok")  # 'tiktok' or 'genai'
     gmail = Column(String(100))
     password = Column(String(100))
