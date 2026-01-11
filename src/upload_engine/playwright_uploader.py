@@ -200,6 +200,9 @@ def upload_video_via_browser(
             desc_input = page.locator("#description-textarea #textbox")
             desc_input.fill(metadata.get("description", "Uploaded via automation"))
 
+            # Кликаем на заголовок, чтобы скрыть всплывающие подсказки из описания
+            title_input.click()
+
             logger.info(f"Setting audience for {account_name}/{channel_name}...")
             not_for_kids_radio = page.locator(
                 "tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK']"
@@ -249,16 +252,16 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "your_email@gmail.com")
-    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "your_password")
-    ACCOUNT_NAME = "MyAccount"  # Example
-    VIDEO_TO_UPLOAD = "path/to/your/video.mp4"
+    GMAIL_ACCOUNT = os.environ.get("YT_GMAIL", "nikitadackov10@gmail.com")
+    GMAIL_PASSWORD = os.environ.get("YT_PASSWORD", "94mabidu")
+    ACCOUNT_NAME = "nikitadackov10"  # Example
+    VIDEO_TO_UPLOAD = r"C:\Users\Sasha\PycharmProjects\youtube-automation\data\output\GraniRealnosti_TV\1768133585\final.mp4"
     VIDEO_METADATA = {
         "title": "My Awesome Automated Video",
         "description": "This video was uploaded using Python and Playwright!\n#automation #python #youtube",
         "gmail": GMAIL_ACCOUNT,
         "password": GMAIL_PASSWORD,
-        "channel_name": "Your Channel Name",
+        "channel_name": "EdgesOfReality_TV",
     }
 
     HEADLESS_MODE = False
