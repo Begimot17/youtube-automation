@@ -150,9 +150,9 @@ def upload_video_via_browser(
                 logger.info(
                     f"Attempting to switch to channel: {channel_name} on account {account_name}"
                 )
-                page.goto("https://www.youtube.com/account", timeout=120000)
+                page.goto("https://www.youtube.com/channel_switcher", timeout=120000)
                 try:
-                    channel_link_selector = f"//a[contains(., '{channel_name}')]"
+                    channel_link_selector = f"//ytd-account-item-renderer[contains(., '{channel_name}')]"
                     channel_link = page.locator(channel_link_selector).first
                     channel_link.click()
                     page.wait_for_load_state("networkidle", timeout=120000)

@@ -30,7 +30,11 @@ pip install -r requirements.txt > nul
 playwright install > nul
 
 :: Run Database Migrations
-echo [INFO] Running database migrations...
+echo [INFO] Running database schema migrations...
+alembic upgrade head
+
+:: Sync data from JSON files to DB
+echo [INFO] Syncing JSON config to database...
 python src/scripts/migrate_to_db.py
 
 :: Start Server (API)

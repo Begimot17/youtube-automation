@@ -12,7 +12,7 @@ from src.upload_engine.playwright_uploader import (
     upload_video_via_browser,
     verify_login_status,
 )
-from src.utils.db import Channel, SessionLocal, UploadHistory, run_migrations
+from src.utils.db import Channel, SessionLocal, UploadHistory
 from src.utils.logging_config import setup_logging
 from src.utils.notifications import send_telegram_message, send_upload_report
 
@@ -342,7 +342,6 @@ async def run_for_channel(account_name, channel_name):
 
 async def main_loop():
     logger.info("Starting Automation Engine (Loop mode)...")
-    run_migrations()
     while True:
         try:
             await run_full_cycle()

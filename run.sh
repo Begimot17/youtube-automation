@@ -37,8 +37,12 @@ echo "[INFO] Checking dependencies..."
 pip install -r requirements.txt > /dev/null
 playwright install > /dev/null
 
-# Run migrations
-echo "[INFO] Running database migrations..."
+# Run database schema migrations
+echo "[INFO] Running database schema migrations..."
+alembic upgrade head
+
+# Sync data from JSON files to DB
+echo "[INFO] Syncing JSON config to database..."
 $PYTHON_EXEC src/scripts/migrate_to_db.py
 
 ##########################################
