@@ -12,7 +12,7 @@ from src.upload_engine.playwright_uploader import (
     upload_video_via_browser,
     verify_login_status,
 )
-from src.utils.db import Channel, SessionLocal, UploadHistory, init_db
+from src.utils.db import Channel, SessionLocal, UploadHistory, run_migrations
 from src.utils.logging_config import setup_logging
 from src.utils.notifications import send_telegram_message, send_upload_report
 
@@ -66,7 +66,35 @@ def mark_item_processed(db, channel_id, item_id):
     db.commit()
 
 
+def is_within_schedule(channel):
+    """Checks if the current time is within the channel's upload schedule."""
+    schedule = channel.schedule
+    if not schedule:
+        return True  # No schedule means upload anytime
+
+    now = datetime.now().time()
+    for time_range in schedule:
+        try:
+            start_str, end_str = time_range.split("-")
+            start_time = datetime.strptime(start_str, "%H:%M").time()
+            end_time = datetime.strptime(end_str, "%H:%M").time()
+            if start_time <= now <= end_time:
+                return True
+        except ValueError:
+            logger.warning(
+                f"Invalid schedule format for {channel.channel_name}: {time_range}"
+            )
+            continue
+    return False
+
+
 def can_upload(channel, db):
+    if not is_within_schedule(channel):
+        logger.info(
+            f"Skipping {channel.channel_name}: Outside of scheduled upload time."
+        )
+        return False
+
     freq = channel.upload_frequency_per_day or 1
     min_delay = channel.min_delay_seconds or 3600
 
@@ -241,7 +269,6 @@ async def process_genai_channel(channel, db):
 async def run_full_cycle():
     """Runs a single pass through all channels."""
     logger.info("Starting a single automation cycle...")
-    init_db()
     db = SessionLocal()
     downloader = TikTokDownloader()
 
@@ -261,7 +288,6 @@ async def run_full_cycle():
 async def run_for_channel(channel_name):
     """Runs automation for a specific channel name."""
     logger.info(f"Triggering manual run for channel: {channel_name}")
-    init_db()
     db = SessionLocal()
     downloader = TikTokDownloader()
 
@@ -283,6 +309,7 @@ async def run_for_channel(channel_name):
 
 async def main_loop():
     logger.info("Starting Automation Engine (Loop mode)...")
+    run_migrations()
     while True:
         try:
             await run_full_cycle()

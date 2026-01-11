@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime
 
+from alembic import command
+from alembic.config import Config as AlembicConfig
 from sqlalchemy import (
     JSON,
     Column,
@@ -28,6 +30,18 @@ engine = create_engine(DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def run_migrations():
+    """Applies any pending Alembic migrations."""
+    logger.info("Checking for and applying database migrations...")
+    alembic_cfg = AlembicConfig("alembic.ini")
+    try:
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied successfully.")
+    except Exception as e:
+        logger.error(f"Error applying database migrations: {e}")
+        raise
+
+
 class Channel(Base):
     __tablename__ = "channels"
 
@@ -45,6 +59,7 @@ class Channel(Base):
     lang = Column(String(10), default="ru")
     voice = Column(String(100))
     description = Column(String(1000), default="#shorts")
+    schedule = Column(JSON, default='["08:00-20:00"]')
 
     # Mode-specific data
     tiktok_sources = Column(JSON)  # List of strings
@@ -68,10 +83,13 @@ class UploadHistory(Base):
 
 def init_db():
     try:
+        # We now use Alembic to manage the schema, so create_all is less critical
+        # but can be kept for initial setup in environments without Alembic.
+        # For a pure Alembic approach, this could be removed.
         Base.metadata.create_all(bind=engine)
-        logger.info("Database initialized successfully.")
+        logger.info("Database tables checked/created.")
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error during table check/creation: {e}")
 
 
 def get_db():

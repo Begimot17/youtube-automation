@@ -17,20 +17,18 @@ load_dotenv()
 setup_logging()
 logger = logging.getLogger("main")
 
-CONFIG_PATH = "config/channels.json"
-HISTORY_PATH = "config/upload_history.json"
 TIKTOK_DOWNLOAD_COUNT = Config.TIKTOK_DOWNLOAD_COUNT
 
 
 def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    with open(Config.CHANNELS_CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def load_history():
-    if os.path.exists(HISTORY_PATH):
+    if os.path.exists(Config.UPLOAD_HISTORY_PATH):
         try:
-            with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+            with open(Config.UPLOAD_HISTORY_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
@@ -38,7 +36,7 @@ def load_history():
 
 
 def save_history(history):
-    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+    with open(Config.UPLOAD_HISTORY_PATH, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=4, ensure_ascii=False)
 
 

@@ -5,17 +5,16 @@ import sys
 # Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from src.config import Config
 from src.utils.db import Channel, SessionLocal
-
-CONFIG_PATH = "config/channels.json"
 
 
 def sync_voices():
     print("Syncing voices from JSON to DB...")
     db = SessionLocal()
     try:
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        if os.path.exists(Config.CHANNELS_CONFIG_PATH):
+            with open(Config.CHANNELS_CONFIG_PATH, "r", encoding="utf-8") as f:
                 channels_data = json.load(f)
                 for c_data in channels_data:
                     name = c_data["channel_name"]

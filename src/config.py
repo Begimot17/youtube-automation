@@ -10,6 +10,13 @@ logger = logging.getLogger("config")
 
 
 class Config:
+    CHANNELS_CONFIG_PATH = os.environ.get(
+        "CHANNELS_CONFIG_PATH", "config/channels.json"
+    )
+    UPLOAD_HISTORY_PATH = os.environ.get(
+        "UPLOAD_HISTORY_PATH", "config/upload_history.json"
+    )
+
     # Google Gemini
     GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") or os.environ.get(
         "GEMINI_API_KEY"

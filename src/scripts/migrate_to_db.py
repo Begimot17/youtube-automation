@@ -6,29 +6,29 @@ from datetime import datetime
 # Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from src.config import Config
 from src.utils.db import Channel, SessionLocal, UploadHistory, init_db
-
-CONFIG_PATH = "config/channels.json"
-HISTORY_PATH = "config/upload_history.json"
 
 
 def migrate():
-    print("Starting migration from JSON to MySQL...")
-    init_db()
+    print("Starting migration from JSON to DB...")
+    init_db()  # Ensures tables are created if they don't exist
+
     db = SessionLocal()
 
     try:
         # 1. Migrate Channels
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        if os.path.exists(Config.CHANNELS_CONFIG_PATH):
+            with open(Config.CHANNELS_CONFIG_PATH, "r", encoding="utf-8") as f:
                 channels_data = json.load(f)
                 for c_data in channels_data:
-                    # Check if channel exists
                     existing = (
                         db.query(Channel)
                         .filter(Channel.channel_name == c_data["channel_name"])
                         .first()
                     )
+                    schedule_data = c_data.get("schedule", ["08:00-20:00"])
+
                     if not existing:
                         channel = Channel(
                             channel_name=c_data["channel_name"],
@@ -46,6 +46,7 @@ def migrate():
                             lang=c_data.get("lang", "ru"),
                             voice=c_data.get("voice"),
                             description=c_data.get("description", "#shorts #tiktok"),
+                            schedule=schedule_data,
                             tiktok_sources=c_data.get("tiktok_sources", []),
                             genai_topics=c_data.get("genai_topics", []),
                         )
@@ -76,6 +77,7 @@ def migrate():
                         existing.description = c_data.get(
                             "description", existing.description
                         )
+                        existing.schedule = schedule_data
                         existing.tiktok_sources = c_data.get(
                             "tiktok_sources", existing.tiktok_sources
                         )
@@ -86,9 +88,9 @@ def migrate():
 
         db.commit()
 
-        # 2. Migrate Upload History
-        if os.path.exists(HISTORY_PATH):
-            with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+        # 2. Migrate Upload History (if needed)
+        if os.path.exists(Config.UPLOAD_HISTORY_PATH):
+            with open(Config.UPLOAD_HISTORY_PATH, "r", encoding="utf-8") as f:
                 history_data = json.load(f)
                 for channel_name, uploads in history_data.items():
                     channel = (
@@ -99,15 +101,10 @@ def migrate():
                     if channel:
                         for item_id in uploads:
                             if not isinstance(item_id, str):
-                                # The old format had a list of strings. If we see something else,
-                                # log it or skip it to be safe.
                                 print(f"Skipping unexpected item in history: {item_id}")
                                 continue
 
-                            # Old format did not have timestamps, so we use now.
                             dt = datetime.utcnow()
-
-                            # Check if history entry exists
                             existing_upload = (
                                 db.query(UploadHistory)
                                 .filter(
@@ -116,7 +113,6 @@ def migrate():
                                 )
                                 .first()
                             )
-
                             if not existing_upload:
                                 upload = UploadHistory(
                                     channel_id=channel.id, item_id=item_id, timestamp=dt
