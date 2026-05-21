@@ -34,7 +34,7 @@ def send_telegram_message(message, parse_mode="HTML"):
 
 
 def send_upload_report(
-    account_name, channel_name, title, status="Success", error_msg=None
+    account_name, channel_name, title, status="Success", error_msg=None, video_url=None
 ):
     """
     Sends a formatted upload report to Telegram.
@@ -48,6 +48,9 @@ def send_upload_report(
     message += f"<b>Channel:</b> {safe_channel}\n"
     message += f"<b>Title:</b> {safe_title}\n"
     message += f"<b>Status:</b> {status}\n"
+
+    if video_url:
+        message += f"<b>URL:</b> {html.escape(str(video_url))}\n"
 
     if error_msg:
         safe_error = html.escape(error_msg)

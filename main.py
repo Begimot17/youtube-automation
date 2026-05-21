@@ -146,18 +146,21 @@ async def process_tiktok_channel(channel, downloader, db):
 
             if await downloader.download_video(video, output_path):
                 title = video.get("title", "")[:70] + " #shorts #tiktok"
+                password = channel.password or os.environ.get(
+                    f"YT_PASSWORD_{account_name.upper()}", ""
+                )
                 metadata = {
                     "title": title,
                     "description": channel.description or "#shorts #tiktok",
                     "gmail": channel.gmail,
-                    "password": channel.password,
+                    "password": password,
                     "channel_name": channel.channel_name,
                 }
                 try:
                     is_logged_in = await asyncio.to_thread(
                         verify_login_status,
                         gmail=channel.gmail,
-                        password=channel.password,
+                        password=password,
                         headless=False,
                         account_name=account_name,
                     )
@@ -168,7 +171,7 @@ async def process_tiktok_channel(channel, downloader, db):
                             f"Login failed for {account_name}/{channel.channel_name}. Skipping."
                         )
                         return
-                    await asyncio.to_thread(
+                    video_url = await asyncio.to_thread(
                         upload_video_via_browser,
                         video_path=os.path.abspath(output_path),
                         metadata=metadata,
@@ -179,7 +182,8 @@ async def process_tiktok_channel(channel, downloader, db):
                     mark_item_processed(db, channel.id, video_id)
 
                     send_upload_report(
-                        account_name, channel.channel_name, title, status="Success"
+                        account_name, channel.channel_name, title,
+                        status="Success", video_url=video_url,
                     )
                     return  # Respect delay
                 except Exception as e:
@@ -195,25 +199,37 @@ async def process_tiktok_channel(channel, downloader, db):
                     )
 
 
+def _pick_unprocessed_topic(channel, db, topics, prefix="genai"):
+    """Returns (topic, item_id) for the first unprocessed topic, or (None, None)."""
+    lang = channel.lang or "ru"
+    shuffled = list(topics)
+    random.shuffle(shuffled)
+    for t in shuffled:
+        item_id = f"{prefix}_{t.replace(' ', '_').lower()}_{lang}"
+        if not is_item_processed(db, channel.id, item_id):
+            return t, item_id
+    return None, None
+
+
 async def process_genai_channel(channel, db):
     if not can_upload(channel, db):
         return
 
     account_name = channel.account_name or channel.channel_name
-    # Pre-check login
+    password = channel.password or os.environ.get(f"YT_PASSWORD_{account_name.upper()}", "")
+
     is_logged_in = await asyncio.to_thread(
         verify_login_status,
         gmail=channel.gmail,
-        password=channel.password,
+        password=password,
         headless=False,
         account_name=account_name,
     )
     if not is_logged_in:
-        msg = f"⚠️ <b>[LOGIN FAILED]</b> Account: <code>{account_name}</code>\nCould not verify login status."
-        send_telegram_message(msg)
-        logger.error(
-            f"Login failed for {account_name}/{channel.channel_name}. Skipping."
+        send_telegram_message(
+            f"⚠️ <b>[LOGIN FAILED]</b> Account: <code>{account_name}</code>\nCould not verify login status."
         )
+        logger.error(f"Login failed for {account_name}/{channel.channel_name}. Skipping.")
         return
 
     topics = channel.genai_topics or []
@@ -222,24 +238,11 @@ async def process_genai_channel(channel, db):
     voice = channel.voice
     proxy = channel.proxy
 
-    logger.info(
-        f"--- Processing GenAI Channel: {account_name}/{channel.channel_name} ---"
-    )
+    logger.info(f"--- Processing GenAI Channel: {account_name}/{channel.channel_name} ---")
     if not topics:
         return
 
-    shuffled_topics = list(topics)
-    random.shuffle(shuffled_topics)
-
-    topic = None
-    item_id = None
-    for t in shuffled_topics:
-        current_item_id = f"genai_{t.replace(' ', '_').lower()}_{lang}"
-        if not is_item_processed(db, channel.id, current_item_id):
-            topic = t
-            item_id = current_item_id
-            break
-
+    topic, item_id = _pick_unprocessed_topic(channel, db, topics, prefix="genai")
     if not topic:
         logger.info(
             f"All GenAI topics for {account_name}/{channel.channel_name} have been processed."
@@ -259,13 +262,13 @@ async def process_genai_channel(channel, db):
             title = f"{topic} #shorts"
             metadata = {
                 "title": title,
-                "description": channel.description or "#shorts #tiktok",
+                "description": channel.description or "#shorts",
                 "gmail": channel.gmail,
-                "password": channel.password,
+                "password": password,
                 "channel_name": channel.channel_name,
             }
             try:
-                await asyncio.to_thread(
+                video_url = await asyncio.to_thread(
                     upload_video_via_browser,
                     video_path=os.path.abspath(video_path),
                     metadata=metadata,
@@ -275,21 +278,94 @@ async def process_genai_channel(channel, db):
                 )
                 mark_item_processed(db, channel.id, item_id)
                 send_upload_report(
-                    account_name, channel.channel_name, title, status="Success"
+                    account_name, channel.channel_name, title,
+                    status="Success", video_url=video_url,
                 )
             except Exception as e:
                 send_upload_report(
-                    account_name,
-                    channel.channel_name,
-                    title,
-                    status="Failed",
-                    error_msg=str(e),
+                    account_name, channel.channel_name, title,
+                    status="Failed", error_msg=str(e),
                 )
-                logger.error(
-                    f"Upload failed for {account_name}/{channel.channel_name}: {e}"
-                )
+                logger.error(f"Upload failed for {account_name}/{channel.channel_name}: {e}")
     except Exception as e:
         logger.error(f"GenAI failed for {account_name}/{channel.channel_name}: {e}")
+
+
+async def process_gen_v2_channel(channel, db):
+    if not can_upload(channel, db):
+        return
+
+    account_name = channel.account_name or channel.channel_name
+    password = channel.password or os.environ.get(f"YT_PASSWORD_{account_name.upper()}", "")
+
+    is_logged_in = await asyncio.to_thread(
+        verify_login_status,
+        gmail=channel.gmail,
+        password=password,
+        headless=False,
+        account_name=account_name,
+    )
+    if not is_logged_in:
+        send_telegram_message(
+            f"⚠️ <b>[LOGIN FAILED]</b> Account: <code>{account_name}</code>\nCould not verify login status."
+        )
+        logger.error(f"Login failed for {account_name}/{channel.channel_name}. Skipping.")
+        return
+
+    topics = channel.genai_topics or []
+    proxy = channel.proxy
+
+    logger.info(f"--- Processing gen_v2 Channel: {account_name}/{channel.channel_name} ---")
+    if not topics:
+        return
+
+    topic, item_id = _pick_unprocessed_topic(channel, db, topics, prefix="gen_v2")
+    if not topic:
+        logger.info(
+            f"All gen_v2 topics for {account_name}/{channel.channel_name} have been processed."
+        )
+        return
+
+    from src.gen_v2.renderer import generate_video_v2
+
+    output_dir = f"data/output/{channel.channel_name}/{int(time.time())}"
+    try:
+        video_path = await asyncio.to_thread(
+            generate_video_v2,
+            action_prompt=topic,
+            output_dir=output_dir,
+        )
+        if video_path and os.path.exists(video_path):
+            title = f"{topic[:70]} #shorts"
+            metadata = {
+                "title": title,
+                "description": channel.description or "#shorts",
+                "gmail": channel.gmail,
+                "password": password,
+                "channel_name": channel.channel_name,
+            }
+            try:
+                video_url = await asyncio.to_thread(
+                    upload_video_via_browser,
+                    video_path=os.path.abspath(video_path),
+                    metadata=metadata,
+                    proxy=proxy,
+                    headless=False,
+                    account_name=account_name,
+                )
+                mark_item_processed(db, channel.id, item_id)
+                send_upload_report(
+                    account_name, channel.channel_name, title,
+                    status="Success", video_url=video_url,
+                )
+            except Exception as e:
+                send_upload_report(
+                    account_name, channel.channel_name, title,
+                    status="Failed", error_msg=str(e),
+                )
+                logger.error(f"gen_v2 upload failed for {account_name}/{channel.channel_name}: {e}")
+    except Exception as e:
+        logger.error(f"gen_v2 generation failed for {account_name}/{channel.channel_name}: {e}")
 
 
 async def run_full_cycle():
@@ -306,6 +382,8 @@ async def run_full_cycle():
                 await process_tiktok_channel(channel, downloader, db)
             elif mode == "genai":
                 await process_genai_channel(channel, db)
+            elif mode == "gen_v2":
+                await process_gen_v2_channel(channel, db)
     finally:
         db.close()
     logger.info("Cycle finished.")
@@ -335,6 +413,8 @@ async def run_for_channel(account_name, channel_name):
             await process_tiktok_channel(target, downloader, db)
         elif mode == "genai":
             await process_genai_channel(target, db)
+        elif mode == "gen_v2":
+            await process_gen_v2_channel(target, db)
         return True
     finally:
         db.close()

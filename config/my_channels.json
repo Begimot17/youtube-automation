@@ -1,0 +1,34 @@
+[
+    {
+        "account_name": "nikitadackov10",
+        "channel_name": "GraniRealnosti_TV",
+        "mode": "genai",
+        "gmail": "nikitadackov10@gmail.com",
+        "password": "",
+        "watch_folder": "data/GraniRealnosti_TV",
+        "proxy": "",
+        "upload_frequency_per_day": 3,
+        "min_delay_seconds": 7200,
+        "lang": "ru",
+        "voice": "ru-RU-DmitryNeural",
+        "quality": "easy",
+        "description": "#shorts",
+        "genai_topics": ["Эффект Манделы: почему мы помним то, чего не было", "Что будет, если исчезнет интернет", "Тайны Марианской впадины", "Как музыка влияет на наш мозг", "Самые странные фобии людей", "Парадоксы времени, которые ломают логику", "Животные с суперспособностями", "Загадка исчезновения Атлантиды", "Как работает интуиция на самом деле", "Что скрывают льды Антарктиды", "Реальные случаи путешествий во времени", "Самые ядовитые существа на планете", "Мифы о здоровом питании, в которые мы верим", "Как распознать ложь за 5 секунд", "Темная материя: из чего состоит Вселенная", "Почему кошки мурлыкают", "Самые охраняемые места в мире", "Эволюция человека: что будет дальше", "История создания интернета", "Феномен дежавю объяснен", "Секреты долгожителей Японии", "Как цвета управляют нашими эмоциями", "Самые дорогие вещества в мире", "Что если бы люди жили на Марсе"]
+    },
+    {
+        "account_name": "nikitadackov10",
+        "channel_name": "EdgesOfReality_TV",
+        "mode": "genai",
+        "gmail": "nikitadackov10@gmail.com",
+        "password": "",
+        "watch_folder": "data/EdgesOfReality_TV",
+        "proxy": "",
+        "upload_frequency_per_day": 3,
+        "min_delay_seconds": 7200,
+        "lang": "en",
+        "voice": "en-US-GuyNeural",
+        "quality": "easy",
+        "description": "#shorts",
+        "genai_topics": ["The Mandela Effect: Why We Remember Things That Never Happened", "What Would Happen If The Internet Disappeared", "Secrets of the Mariana Trench", "How Music Affects Our Brain", "Time Paradoxes That Break Logic", "Animals With Superpowers", "The Mystery of Atlantis' Disappearance", "How Intuition Actually Works", "What Is Hidden Under The Antarctic Ice", "Real Cases of Time Travel", "The Most Poisonous Creatures on the Planet", "Healthy Eating Myths We Believe", "How To Spot A Lie In 5 Seconds", "Dark Matter: What The Universe Is Made Of", "Why Cats Purr", "The Most Guarded Places In The World", "Human Evolution: What Comes Next", "The History of the Internet", "The Deja Vu Phenomenon Explained", "Secrets of Japanese Centenarians", "How Colors Control Our Emotions", "The Most Expensive Substances in the World", "What If Humans Lived on Mars"]
+    }
+]
