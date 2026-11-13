@@ -201,3 +201,63 @@ def test_api_down_reports_error(bot, monkeypatch):
     upd, msg = make_update("/status")
     asyncio.run(bot.status_command(upd, SimpleNamespace(args=[])))
     assert "refused" in msg.replies[0][1]
+
+
+def test_status_escapes_job_and_reports_http_errors(bot, monkeypatch):
+    use_api(bot, monkeypatch, FakeResponse(200, {"status": "Running", "job": "<x>"}))
+    upd, msg = make_update("/status")
+    asyncio.run(bot.status_command(upd, SimpleNamespace(args=[])))
+    assert "&lt;x&gt;" in msg.replies[0][1]
+
+    use_api(bot, monkeypatch, FakeResponse(401, {"error": "Unauthorized"}))
+    upd, msg = make_update("/status")
+    asyncio.run(bot.status_command(upd, SimpleNamespace(args=[])))
+    assert "Unauthorized" in msg.replies[0][1]
+
+
+def test_run_command_non_json_error_body(bot, monkeypatch):
+    use_api(bot, monkeypatch, FakeResponse(502, text="<html>Bad gateway</html>"))
+    upd, msg = make_update("/run a b")
+    asyncio.run(bot.run_command(upd, SimpleNamespace(args=["a", "b"])))
+    assert "HTTP 502" in msg.replies[0][1]
+
+
+def test_channels_escapes_names_and_skips_long_buttons(bot, monkeypatch):
+    channels = [
+        {"account_name": "a<b", "channel_name": "c"},
+        {"account_name": "x" * 40, "channel_name": "y" * 40},
+    ]
+    use_api(bot, monkeypatch, FakeResponse(200, channels))
+    upd, msg = make_update("/channels")
+    asyncio.run(bot.channels_command(upd, SimpleNamespace(args=[])))
+    _, first, first_kw = msg.replies[1]
+    assert "a&lt;b" in first and "reply_markup" in first_kw
+    _, second, second_kw = msg.replies[2]
+    assert "too long" in second and "reply_markup" not in second_kw
+
+
+def test_malformed_button_data_is_ignored(bot, monkeypatch):
+    fake = use_api(bot, monkeypatch, FakeResponse(200, {}))
+    answered = []
+
+    async def answer():
+        answered.append(True)
+
+    query = SimpleNamespace(data="garbage", answer=answer)
+    upd = SimpleNamespace(effective_chat=SimpleNamespace(id=42), callback_query=query)
+    asyncio.run(bot.button_callback(upd, None))
+    assert answered and fake.calls == []
+
+
+def test_add_channel_rejects_non_object(bot, monkeypatch):
+    fake = use_api(bot, monkeypatch, FakeResponse(201, {}))
+    upd, msg = make_update("/add_channel [1]")
+    asyncio.run(bot.add_channel_command(upd, SimpleNamespace(args=["[1]"])))
+    assert fake.calls == [] and "JSON object" in msg.replies[0][1]
+
+
+def test_disk_escapes_values(bot, monkeypatch):
+    use_api(bot, monkeypatch, FakeResponse(200, {"<dir>": "1 MB"}))
+    upd, msg = make_update("/disk")
+    asyncio.run(bot.disk_command(upd, SimpleNamespace(args=[])))
+    assert "&lt;dir&gt;" in msg.replies[0][1]

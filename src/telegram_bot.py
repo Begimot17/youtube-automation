@@ -91,6 +91,7 @@ async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 TOKEN = Config.TELEGRAM_BOT_TOKEN
 AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID
 API_BASE_URL = Config.API_BASE_URL
+CALLBACK_DATA_LIMIT = 64  # bytes, Telegram's limit for inline button data
 
 # All calls to the control API go through one async client that carries the
 # shared token; async so a slow API never blocks polling of other updates.
@@ -110,6 +111,29 @@ async def close_api(application=None):
     if _api is not None:
         await _api.aclose()
         _api = None
+
+
+class ApiError(Exception):
+    """The control API answered with an error status."""
+
+
+def api_error(response):
+    """Error text from an API response, tolerating non-JSON bodies (proxies, 502s)."""
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("error"):
+        return str(data["error"])
+    return f"HTTP {response.status_code}"
+
+
+async def api_json(method, path, **kwargs):
+    """Calls the API and returns its JSON body; raises ApiError on 4xx/5xx."""
+    response = await getattr(get_api(), method)(path, **kwargs)
+    if response.status_code >= 400:
+        raise ApiError(api_error(response))
+    return response.json()
 
 
 def restricted(func):
@@ -153,16 +177,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = await get_api().get("/status", timeout=15)
-        data = response.json()
+        data = await api_json("get", "/status", timeout=15)
         status = data.get("status", "Unknown")
         job = data.get("job", "None")
         duration = data.get("duration_seconds", 0)
 
-        msg = f"⚙️ <b>Status:</b> {status}\n"
+        msg = f"⚙️ <b>Status:</b> {html.escape(str(status))}\n"
         if status == "Running":
-            msg += f"🎬 <b>Job:</b> {job}\n"
-            msg += f"⏳ <b>Duration:</b> {duration}s"
+            msg += f"🎬 <b>Job:</b> {html.escape(str(job))}\n"
+            msg += f"⏳ <b>Duration:</b> {html.escape(str(duration))}s"
 
         await update.message.reply_html(msg)
     except Exception as e:
@@ -173,8 +196,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists all channels with interactive buttons."""
     try:
-        response = await get_api().get("/channels", timeout=15)
-        channels = response.json()
+        channels = await api_json("get", "/channels", timeout=15)
 
         if not channels:
             await update.message.reply_text("No channels configured.")
@@ -185,21 +207,26 @@ async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for channel in channels:
             account_name = channel["account_name"]
             channel_name = channel["channel_name"]
+            title = f"🔹 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>"
+            run_data = f"run:{account_name}:{channel_name}"
+            del_data = f"del:{account_name}:{channel_name}"
+            if (
+                max(len(run_data.encode()), len(del_data.encode()))
+                > CALLBACK_DATA_LIMIT
+            ):
+                # Telegram rejects the whole message if callback data is too long.
+                await update.message.reply_html(
+                    f"{title}\n<i>Name too long for buttons, use /run or /del_channel.</i>"
+                )
+                continue
             keyboard = [
                 [
-                    InlineKeyboardButton(
-                        "🚀 Run", callback_data=f"run:{account_name}:{channel_name}"
-                    ),
-                    InlineKeyboardButton(
-                        "🗑 Delete", callback_data=f"del:{account_name}:{channel_name}"
-                    ),
+                    InlineKeyboardButton("🚀 Run", callback_data=run_data),
+                    InlineKeyboardButton("🗑 Delete", callback_data=del_data),
                 ]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(
-                f"🔹 <b>{account_name}/{channel_name}</b>",
-                reply_markup=reply_markup,
-                parse_mode="HTML",
+            await update.message.reply_html(
+                title, reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
     except Exception as e:
@@ -212,8 +239,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    data = query.data
-    action, account_name, channel_name = data.split(":", 2)
+    parts = (query.data or "").split(":", 2)
+    if len(parts) != 3:
+        logger.warning("Ignoring malformed button data %r", query.data)
+        return
+    action, account_name, channel_name = parts
 
     if action == "run":
         try:
@@ -228,7 +258,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML",
                 )
             else:
-                err = response.json().get("error", "Unknown error")
+                err = api_error(response)
                 await query.edit_message_text(
                     f"⚠️ <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Failed to start ({html.escape(err)})",
                     parse_mode="HTML",
@@ -276,7 +306,7 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🚀 <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: Started successfully!"
             )
         else:
-            err = response.json().get("error", "Unknown error")
+            err = api_error(response)
             await update.message.reply_html(
                 f"⚠️ <b>{html.escape(account_name)}/{html.escape(channel_name)}</b>: {html.escape(err)}"
             )
@@ -296,14 +326,18 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     json_str = " ".join(context.args)
     try:
         data = json.loads(json_str)
+        if not isinstance(data, dict):
+            await update.message.reply_text("❌ Expected a JSON object.")
+            return
         response = await get_api().post("/channel", json=data, timeout=15)
         if response.status_code == 201:
             await update.message.reply_html(
-                f"✅ <b>{html.escape(data['account_name'])}/{html.escape(data['channel_name'])}</b>: Created successfully!"
+                f"✅ <b>{html.escape(str(data.get('account_name')))}/{html.escape(str(data.get('channel_name')))}</b>: Created successfully!"
             )
         else:
-            err = response.json().get("error", "Unknown error")
-            await update.message.reply_html(f"⚠️ Failed: {html.escape(err)}")
+            await update.message.reply_html(
+                f"⚠️ Failed: {html.escape(api_error(response))}"
+            )
     except json.JSONDecodeError:
         await update.message.reply_text("❌ Invalid JSON format.")
     except Exception as e:
@@ -371,8 +405,8 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"The video will be sent to you automatically when ready."
             )
         else:
-            err = response.json().get("error", "Unknown error")
-            await update.message.reply_html(f"⚠️ <b>Failed:</b> {html.escape(str(err))}")
+            err = api_error(response)
+            await update.message.reply_html(f"⚠️ <b>Failed:</b> {html.escape(err)}")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
@@ -381,14 +415,13 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = await get_api().post("/run/all", timeout=15)
-        data = response.json()
         if response.status_code == 200:
             await update.message.reply_html(
                 "🚀 <b>Execution started!</b> Check /status for progress."
             )
         else:
             await update.message.reply_html(
-                f"⚠️ <b>Failed:</b> {html.escape(str(data.get('error', 'Unknown error')))}"
+                f"⚠️ <b>Failed:</b> {html.escape(api_error(response))}"
             )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
@@ -397,10 +430,11 @@ async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = await get_api().post("/cleanup", timeout=30)
-        data = response.json()
+        data = await api_json("post", "/cleanup", timeout=30)
         cleaned = data.get("cleaned_directories", [])
-        msg = "🧹 <b>Cleanup finished:</b>\n" + "\n".join([f"- {d}" for d in cleaned])
+        msg = "🧹 <b>Cleanup finished:</b>\n" + "\n".join(
+            f"- {html.escape(str(d))}" for d in cleaned
+        )
         await update.message.reply_html(msg)
     except Exception as e:
         await update.message.reply_text(f"❌ Error during cleanup: {e}")
@@ -409,8 +443,7 @@ async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = await get_api().get("/logs", timeout=15)
-        lines = response.json()
+        lines = await api_json("get", "/logs", timeout=15)
         if not isinstance(lines, list):
             raise ValueError(str(lines))
         await update.message.reply_html(format_log_tail(lines))
@@ -421,11 +454,10 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def disk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = await get_api().get("/disk", timeout=15)
-        stats = response.json()
+        stats = await api_json("get", "/disk", timeout=15)
         msg = "💾 <b>Disk Usage:</b>\n"
         for folder, size in stats.items():
-            msg += f"- <b>{folder}:</b> {size}\n"
+            msg += f"- <b>{html.escape(str(folder))}:</b> {html.escape(str(size))}\n"
         await update.message.reply_html(msg)
     except Exception as e:
         await update.message.reply_text(f"❌ Error fetching disk stats: {e}")
