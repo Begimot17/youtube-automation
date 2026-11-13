@@ -2,10 +2,7 @@ import logging
 import math
 import os
 
-import numpy as np
 import PIL.Image
-import PIL.ImageDraw
-import PIL.ImageFont
 
 # Monkeypatch for PIL.Image.ANTIALIAS (removed in Pillow 10.0.0)
 if not hasattr(PIL.Image, "ANTIALIAS"):
@@ -22,6 +19,8 @@ from moviepy.editor import (
     VideoFileClip,
     concatenate_videoclips,
 )
+
+from src.rendering.text_image import render_text_image
 
 logger = logging.getLogger(__name__)
 
@@ -79,66 +78,10 @@ class VideoRenderer:
         Creates a text clip using PIL (no ImageMagick dependency).
         """
         try:
-            # Create a transparent image
-            img = PIL.Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-            draw = PIL.ImageDraw.Draw(img)
-
-            # Try to load a font from the local 'fonts' directory first
-            font_dir = os.path.join(os.path.dirname(__file__), "..", "fonts")
-            font_paths = [
-                os.path.join(font_dir, "LiberationSans-Bold.ttf"),
-                "C:/Windows/Fonts/arialbd.ttf",
-                "C:/Windows/Fonts/arial.ttf",
-                "C:/Windows/Fonts/seguiemj.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                "LiberationSans-Bold",
-                "Arial.ttf",
-                "sans-serif",
-            ]
-            font = None
-            for p in font_paths:
-                try:
-                    if os.path.exists(p):
-                        font = PIL.ImageFont.truetype(p, font_size)
-                        break
-                except Exception:
-                    continue
-
-            if not font:
-                logger.warning("No suitable font found. Loading default.")
-                font = PIL.ImageFont.load_default()
-
-            # Measure text
-            try:
-                # Newer versions of Pillow
-                bbox = draw.textbbox((0, 0), text, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-            except AttributeError:
-                # Older versions
-                w, h = draw.textsize(text, font=font)
-
-            # Calculate position (center)
-            x = (self.width - w) / 2
-            y = (self.height - h) / 2
-
-            # Draw background/outline (simple stroke)
-            stroke_width = 3
-            for offset_x in range(-stroke_width, stroke_width + 1):
-                for offset_y in range(-stroke_width, stroke_width + 1):
-                    draw.text(
-                        (x + offset_x, y + offset_y), text, font=font, fill="black"
-                    )
-
-            # Draw main text
-            draw.text((x, y), text, font=font, fill=color)
-
-            # Convert to numpy array for MoviePy
-            img_np = np.array(img)
-
-            # Create ImageClip
+            img_np = render_text_image(
+                text, max_width=self.width, color=color, font_size=font_size
+            )
             return ImageClip(img_np).set_duration(duration)
-
         except Exception as e:
             logger.error(f"PIL Text rendering failed: {e}")
             return None
