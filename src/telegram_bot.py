@@ -7,6 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 from src.config import Config
+from src.utils.formatting import format_log_tail
 
 # Logging
 logging.basicConfig(
@@ -126,7 +127,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "run":
         try:
             response = requests.post(
-                f"{API_BASE_URL}/run/channel?account_name={account_name}&channel_name={channel_name}",
+                f"{API_BASE_URL}/run/channel",
+                params={"account_name": account_name, "channel_name": channel_name},
                 timeout=15,
             )
             if response.status_code == 200:
@@ -146,7 +148,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "del":
         try:
             response = requests.delete(
-                f"{API_BASE_URL}/channel?account_name={account_name}&channel_name={channel_name}",
+                f"{API_BASE_URL}/channel",
+                params={"account_name": account_name, "channel_name": channel_name},
                 timeout=15,
             )
             if response.status_code == 200:
@@ -173,7 +176,8 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     account_name, channel_name = context.args
     try:
         response = requests.post(
-            f"{API_BASE_URL}/run/channel?account_name={account_name}&channel_name={channel_name}",
+            f"{API_BASE_URL}/run/channel",
+            params={"account_name": account_name, "channel_name": channel_name},
             timeout=15,
         )
         if response.status_code == 200:
@@ -227,7 +231,8 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     account_name, channel_name = context.args
     try:
         response = requests.delete(
-            f"{API_BASE_URL}/channel?account_name={account_name}&channel_name={channel_name}",
+            f"{API_BASE_URL}/channel",
+            params={"account_name": account_name, "channel_name": channel_name},
             timeout=15,
         )
         if response.status_code == 200:
@@ -276,7 +281,7 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             err = response.json().get("error", "Unknown error")
-            await update.message.reply_html(f"⚠️ <b>Failed:</b> {err}")
+            await update.message.reply_html(f"⚠️ <b>Failed:</b> {html.escape(str(err))}")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
@@ -292,7 +297,7 @@ async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_html(
-                f"⚠️ <b>Failed:</b> {data.get('error', 'Unknown error')}"
+                f"⚠️ <b>Failed:</b> {html.escape(str(data.get('error', 'Unknown error')))}"
             )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
@@ -315,16 +320,9 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.get(f"{API_BASE_URL}/logs", timeout=15)
         lines = response.json()
-        # Take last 50 lines to keep message size reasonable
-        log_text = "".join(lines[-50:])
-        if not log_text:
-            log_text = "No logs available."
-
-        # Split into several messages if too long for Telegram (4096 chars)
-        if len(log_text) > 4000:
-            log_text = log_text[-4000:]
-
-        await update.message.reply_html(f"📋 <b>Last Logs:</b>\n<pre>{log_text}</pre>")
+        if not isinstance(lines, list):
+            raise ValueError(str(lines))
+        await update.message.reply_html(format_log_tail(lines))
     except Exception as e:
         await update.message.reply_text(f"❌ Error fetching logs: {e}")
 
