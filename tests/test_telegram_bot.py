@@ -43,9 +43,7 @@ def test_describe_command_with_args(bot):
 
 
 def test_describe_redacts_add_channel_json(bot):
-    desc = bot.describe_update(
-        command_update('/add_channel {"password": "s3cret"}')
-    )
+    desc = bot.describe_update(command_update('/add_channel {"password": "s3cret"}'))
     assert "s3cret" not in desc
     assert "/add_channel" in desc
 
@@ -63,7 +61,8 @@ def test_log_update_logs_at_info(bot, caplog):
     with caplog.at_level(logging.INFO, logger="telegram_bot"):
         asyncio.run(bot.log_update(command_update("/status"), None))
     assert any(
-        r.levelno == logging.INFO and "/status" in r.getMessage() for r in caplog.records
+        r.levelno == logging.INFO and "/status" in r.getMessage()
+        for r in caplog.records
     )
 
 
@@ -96,9 +95,109 @@ def test_script_imports_without_pythonpath(tmp_path):
         cwd=str(tmp_path),
         env={**env, "TELEGRAM_BOT_TOKEN": "", "DB_TYPE": "mysql"},
         capture_output=True,
+        check=False,
         text=True,
         timeout=60,
     )
     assert "TELEGRAM_BOT_TOKEN not found" in proc.stderr, proc.stderr
     assert proc.returncode == 1
     assert "POLLING" not in proc.stderr
+
+
+class FakeResponse:
+    def __init__(self, status_code=200, payload=None, text=None):
+        self.status_code = status_code
+        self._payload = payload
+        self._text = text
+
+    def json(self):
+        if self._text is not None:
+            raise ValueError("not json")
+        return self._payload
+
+
+class FakeApi:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+        self.is_closed = False
+
+    async def _call(self, method, url, **kwargs):
+        self.calls.append((method, url, kwargs))
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+    async def get(self, url, **kw):
+        return await self._call("GET", url, **kw)
+
+    async def post(self, url, **kw):
+        return await self._call("POST", url, **kw)
+
+    async def delete(self, url, **kw):
+        return await self._call("DELETE", url, **kw)
+
+
+class FakeMessage:
+    def __init__(self, text=""):
+        self.text = text
+        self.replies = []
+
+    async def reply_html(self, text, **kw):
+        self.replies.append(("html", text, kw))
+
+    async def reply_text(self, text, **kw):
+        self.replies.append(("text", text, kw))
+
+
+def make_update(text="", chat_id=42):
+    msg = FakeMessage(text)
+    upd = SimpleNamespace(
+        update_id=1,
+        effective_chat=SimpleNamespace(id=chat_id),
+        callback_query=None,
+        effective_message=msg,
+        message=msg,
+    )
+    return upd, msg
+
+
+def use_api(bot, monkeypatch, response):
+    fake = FakeApi(response)
+    monkeypatch.setattr(bot, "_api", fake)
+    return fake
+
+
+def test_get_api_carries_token_and_base_url(bot, monkeypatch):
+    monkeypatch.setattr(bot.Config, "API_TOKEN", "tok")
+    client = bot.get_api()
+    try:
+        assert client.headers["X-API-Token"] == "tok"
+        assert str(client.base_url).startswith("http://api.test")
+    finally:
+        asyncio.run(bot.close_api())
+    assert bot._api is None
+
+
+def test_run_command_posts_channel(bot, monkeypatch):
+    fake = use_api(bot, monkeypatch, FakeResponse(200, {}))
+    upd, msg = make_update("/run acc chan")
+    asyncio.run(bot.run_command(upd, SimpleNamespace(args=["acc", "chan"])))
+    assert fake.calls[0][:2] == ("POST", "/run/channel")
+    assert fake.calls[0][2]["params"] == {"account_name": "acc", "channel_name": "chan"}
+    assert "Started" in msg.replies[0][1]
+
+
+def test_unauthorized_chat_is_ignored(bot, monkeypatch):
+    fake = use_api(bot, monkeypatch, FakeResponse(200, {}))
+    upd, msg = make_update("/status", chat_id=999)
+    asyncio.run(bot.status_command(upd, SimpleNamespace(args=[])))
+    assert fake.calls == []
+    assert msg.replies == []
+
+
+def test_api_down_reports_error(bot, monkeypatch):
+    use_api(bot, monkeypatch, ConnectionError("refused"))
+    upd, msg = make_update("/status")
+    asyncio.run(bot.status_command(upd, SimpleNamespace(args=[])))
+    assert "refused" in msg.replies[0][1]
