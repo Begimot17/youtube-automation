@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 from main import run_for_channel, run_full_cycle
 from src.config import Config
 from src.factory import create_content
+from src.utils.auth import is_authorized
 from src.utils.db import Channel, SessionLocal, UploadHistory, init_db
 from src.utils.notifications import send_telegram_message, send_telegram_video
 
@@ -19,6 +20,16 @@ logger = logging.getLogger("server")
 # Global lock to prevent multiple overlapping runs if triggered manually
 run_lock = threading.Lock()
 job_info = {"status": "Idle", "start_time": None, "current_job": None}
+
+
+@app.before_request
+def require_api_token():
+    """If API_TOKEN is set, every endpoint except /health needs it."""
+    if request.path == "/health":
+        return None
+    if not is_authorized(request.headers, Config.API_TOKEN):
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
 
 
 def start_async_task(coro, job_name="Unknown"):
@@ -511,4 +522,8 @@ if __name__ == "__main__":
 
     # Run server on 0.0.0.0 for Docker/n8n access
     port = Config.PORT
+    if not Config.API_TOKEN:
+        logger.warning(
+            "API_TOKEN is not set: the control API is open to anyone who can reach it."
+        )
     app.run(host="0.0.0.0", port=port)

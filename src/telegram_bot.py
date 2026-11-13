@@ -20,6 +20,11 @@ TOKEN = Config.TELEGRAM_BOT_TOKEN
 AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID
 API_BASE_URL = Config.API_BASE_URL
 
+# All calls to the control API go through one session that carries the shared token.
+api = requests.Session()
+if Config.API_TOKEN:
+    api.headers["X-API-Token"] = Config.API_TOKEN
+
 
 def restricted(func):
     """Decorator to restrict access to the authorized user."""
@@ -62,7 +67,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/status", timeout=15)
+        response = api.get(f"{API_BASE_URL}/status", timeout=15)
         data = response.json()
         status = data.get("status", "Unknown")
         job = data.get("job", "None")
@@ -82,7 +87,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists all channels with interactive buttons."""
     try:
-        response = requests.get(f"{API_BASE_URL}/channels", timeout=15)
+        response = api.get(f"{API_BASE_URL}/channels", timeout=15)
         channels = response.json()
 
         if not channels:
@@ -126,7 +131,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "run":
         try:
-            response = requests.post(
+            response = api.post(
                 f"{API_BASE_URL}/run/channel",
                 params={"account_name": account_name, "channel_name": channel_name},
                 timeout=15,
@@ -147,7 +152,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "del":
         try:
-            response = requests.delete(
+            response = api.delete(
                 f"{API_BASE_URL}/channel",
                 params={"account_name": account_name, "channel_name": channel_name},
                 timeout=15,
@@ -175,7 +180,7 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     account_name, channel_name = context.args
     try:
-        response = requests.post(
+        response = api.post(
             f"{API_BASE_URL}/run/channel",
             params={"account_name": account_name, "channel_name": channel_name},
             timeout=15,
@@ -205,7 +210,7 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     json_str = " ".join(context.args)
     try:
         data = json.loads(json_str)
-        response = requests.post(f"{API_BASE_URL}/channel", json=data, timeout=15)
+        response = api.post(f"{API_BASE_URL}/channel", json=data, timeout=15)
         if response.status_code == 201:
             await update.message.reply_html(
                 f"✅ <b>{html.escape(data['account_name'])}/{html.escape(data['channel_name'])}</b>: Created successfully!"
@@ -230,7 +235,7 @@ async def del_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     account_name, channel_name = context.args
     try:
-        response = requests.delete(
+        response = api.delete(
             f"{API_BASE_URL}/channel",
             params={"account_name": account_name, "channel_name": channel_name},
             timeout=15,
@@ -265,7 +270,7 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     topic = " ".join(topic_words)
 
     try:
-        response = requests.post(
+        response = api.post(
             f"{API_BASE_URL}/render/custom",
             json={"topic": topic, "lang": lang},
             timeout=15,
@@ -289,7 +294,7 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.post(f"{API_BASE_URL}/run/all", timeout=15)
+        response = api.post(f"{API_BASE_URL}/run/all", timeout=15)
         data = response.json()
         if response.status_code == 200:
             await update.message.reply_html(
@@ -306,7 +311,7 @@ async def run_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.post(f"{API_BASE_URL}/cleanup", timeout=30)
+        response = api.post(f"{API_BASE_URL}/cleanup", timeout=30)
         data = response.json()
         cleaned = data.get("cleaned_directories", [])
         msg = "🧹 <b>Cleanup finished:</b>\n" + "\n".join([f"- {d}" for d in cleaned])
@@ -318,7 +323,7 @@ async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/logs", timeout=15)
+        response = api.get(f"{API_BASE_URL}/logs", timeout=15)
         lines = response.json()
         if not isinstance(lines, list):
             raise ValueError(str(lines))
@@ -330,7 +335,7 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def disk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(f"{API_BASE_URL}/disk", timeout=15)
+        response = api.get(f"{API_BASE_URL}/disk", timeout=15)
         stats = response.json()
         msg = "💾 <b>Disk Usage:</b>\n"
         for folder, size in stats.items():

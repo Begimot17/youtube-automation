@@ -68,6 +68,8 @@ class Config:
         DATABASE_URL = os.environ.get("DATABASE_URL") or DEFAULT_DB
 
     # Server
+    # Optional shared secret for the control API (server + bot). Empty = open.
+    API_TOKEN = os.environ.get("API_TOKEN") or None
     PORT = env_int("PORT", 5000, minimum=1)
 
     # Debug mode
