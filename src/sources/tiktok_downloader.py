@@ -7,6 +7,14 @@ import yt_dlp
 logger = logging.getLogger(__name__)
 
 
+def clean_username(username):
+    """Accepts "@name", "name" or a profile URL and returns the bare handle."""
+    name = str(username or "").strip()
+    if "tiktok.com/" in name:
+        name = name.split("tiktok.com/", 1)[1].split("?", 1)[0].strip("/")
+    return name.lstrip("@").split("/")[0]
+
+
 class TikTokDownloader:
     """
     A class to download videos from TikTok channels using yt-dlp.
@@ -21,7 +29,11 @@ class TikTokDownloader:
         """
         Fetches metadata for the specified number of videos from a user's profile using yt-dlp.
         """
-        # TikTok URL
+        username = clean_username(username)
+        if not username:
+            logger.error("Empty TikTok username.")
+            return []
+        count = max(1, int(count))
         url = f"https://www.tiktok.com/@{username}"
 
         # yt-dlp options for metadata extraction
@@ -36,9 +48,8 @@ class TikTokDownloader:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
                 info = ydl.extract_info(url, download=False)
-                if "entries" in info:
-                    return info["entries"]
-                return []
+                entries = (info or {}).get("entries") or []
+                return [e for e in entries if e]
             except Exception as e:
                 logger.error(f"Failed to fetch video list: {e}")
                 return []
@@ -82,7 +93,11 @@ class TikTokDownloader:
                 return False
 
         logger.info(f"Downloading {video_url}...")
-        await asyncio.to_thread(self.download_video_sync, video_url, output_path)
+        try:
+            await asyncio.to_thread(self.download_video_sync, video_url, output_path)
+        except Exception as e:
+            logger.error(f"yt-dlp failed for {video_url}: {e}")
+            return False
         if os.path.exists(output_path):
             logger.info(f"✅ Video saved to: {output_path}")
             return True
@@ -111,7 +126,9 @@ class TikTokDownloader:
             if not video_id:
                 continue
 
-            output_path = os.path.join(output_folder, f"{username}_{video_id}.mp4")
+            output_path = os.path.join(
+                output_folder, f"{clean_username(username)}_{video_id}.mp4"
+            )
 
             if os.path.exists(output_path):
                 logger.info(f"Video {video_id} already exists, skipping.")
