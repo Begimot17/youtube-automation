@@ -12,6 +12,15 @@ TELEGRAM_CHAT_ID = Config.TELEGRAM_CHAT_ID
 
 
 TELEGRAM_MAX_LEN = 4096
+TELEGRAM_CAPTION_MAX_LEN = 1024
+
+
+def _redact(error):
+    """Error text without the bot token (request errors embed the API URL)."""
+    text = str(error)
+    if TELEGRAM_BOT_TOKEN:
+        text = text.replace(TELEGRAM_BOT_TOKEN, "<token>")
+    return text
 
 
 def truncate_message(message, limit=TELEGRAM_MAX_LEN):
@@ -37,10 +46,16 @@ def send_telegram_message(message, parse_mode="HTML"):
 
     try:
         response = requests.post(url, json=payload, timeout=30)
+        if getattr(response, "status_code", None) == 400 and parse_mode:
+            # Usually broken markup (e.g. a tag cut by truncation): resend as
+            # plain text rather than lose the notification.
+            logger.warning("Telegram rejected formatted message, resending as plain text")
+            payload.pop("parse_mode")
+            response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
         return True
     except Exception as e:
-        logger.error(f"Failed to send Telegram message: {e}")
+        logger.error(f"Failed to send Telegram message: {_redact(e)}")
         return False
 
 
@@ -85,11 +100,11 @@ def send_telegram_video(video_path, caption=None):
             files = {"video": video}
             data = {"chat_id": TELEGRAM_CHAT_ID}
             if caption:
-                data["caption"] = caption
+                data["caption"] = truncate_message(caption, TELEGRAM_CAPTION_MAX_LEN)
 
             response = requests.post(url, data=data, files=files, timeout=180)
             response.raise_for_status()
             return True
     except Exception as e:
-        logger.error(f"Failed to send Telegram video: {e}")
+        logger.error(f"Failed to send Telegram video: {_redact(e)}")
         return False
