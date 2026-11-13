@@ -88,8 +88,8 @@ async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Incoming %s", describe_update(update))
 
 
-TOKEN = Config.TELEGRAM_BOT_TOKEN
-AUTHORIZED_CHAT_ID = Config.TELEGRAM_CHAT_ID
+TOKEN = (Config.TELEGRAM_BOT_TOKEN or "").strip() or None
+AUTHORIZED_CHAT_ID = (Config.TELEGRAM_CHAT_ID or "").strip() or None
 API_BASE_URL = Config.API_BASE_URL
 CALLBACK_DATA_LIMIT = 64  # bytes, Telegram's limit for inline button data
 
@@ -489,7 +489,14 @@ def build_application(token):
     application.add_handler(CommandHandler("disk", disk_command))
 
     application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_error_handler(on_error)
     return application
+
+
+async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
+    """Logs handler/polling errors instead of PTB's bare 'No error handlers' dump."""
+    where = describe_update(update) if isinstance(update, Update) else "polling"
+    logger.error("Error while handling %s", where, exc_info=context.error)
 
 
 def main():
@@ -497,13 +504,18 @@ def main():
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not found.")
         return 1
+    if not AUTHORIZED_CHAT_ID:
+        logger.warning("TELEGRAM_CHAT_ID not set: every command will be ignored.")
 
     application = build_application(TOKEN)
     logger.info(
         "Bot started in %.2fs, polling for commands...",
         time.perf_counter() - _STARTED_AT,
     )
-    application.run_polling()
+    # Started on demand, possibly before the network is up: keep retrying the
+    # initial connection instead of exiting. Pending updates are kept so the
+    # command that triggered the start is still answered.
+    application.run_polling(bootstrap_retries=-1, drop_pending_updates=False)
     return 0
 
 

@@ -261,3 +261,38 @@ def test_disk_escapes_values(bot, monkeypatch):
     upd, msg = make_update("/disk")
     asyncio.run(bot.disk_command(upd, SimpleNamespace(args=[])))
     assert "&lt;dir&gt;" in msg.replies[0][1]
+
+
+def test_main_polls_with_retries_and_keeps_pending(bot, monkeypatch):
+    seen = {}
+
+    class FakeApp:
+        def run_polling(self, **kwargs):
+            seen.update(kwargs)
+
+    monkeypatch.setattr(bot, "build_application", lambda token: FakeApp())
+    assert bot.main() == 0
+    assert seen["bootstrap_retries"] == -1
+    assert seen["drop_pending_updates"] is False
+
+
+def test_error_handler_registered_and_logs(bot, caplog):
+    app = bot.build_application("123:abc")
+    assert bot.on_error in app.error_handlers
+    ctx = SimpleNamespace(error=RuntimeError("boom"))
+    with caplog.at_level(logging.ERROR, logger="telegram_bot"):
+        asyncio.run(bot.on_error(None, ctx))
+    assert any("polling" in r.getMessage() for r in caplog.records)
+
+
+def test_chat_id_whitespace_is_ignored(monkeypatch):
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: False)
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", " 42 \n")
+    for name in ("src.config", "src.telegram_bot"):
+        sys.modules.pop(name, None)
+    try:
+        mod = importlib.import_module("src.telegram_bot")
+        assert mod.AUTHORIZED_CHAT_ID == "42"
+    finally:
+        for name in ("src.config", "src.telegram_bot"):
+            sys.modules.pop(name, None)
