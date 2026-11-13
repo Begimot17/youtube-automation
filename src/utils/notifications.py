@@ -11,6 +11,17 @@ TELEGRAM_BOT_TOKEN = Config.TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID = Config.TELEGRAM_CHAT_ID
 
 
+TELEGRAM_MAX_LEN = 4096
+
+
+def truncate_message(message, limit=TELEGRAM_MAX_LEN):
+    """Telegram rejects text over 4096 chars; cut with an ellipsis instead of failing."""
+    message = str(message)
+    if len(message) <= limit:
+        return message
+    return message[: limit - 1] + "…"
+
+
 def send_telegram_message(message, parse_mode="HTML"):
     """
     Sends a message via Telegram Bot API with HTML support.
@@ -22,7 +33,7 @@ def send_telegram_message(message, parse_mode="HTML"):
         return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": parse_mode}
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": truncate_message(message), "parse_mode": parse_mode}
 
     try:
         response = requests.post(url, json=payload, timeout=30)
@@ -39,9 +50,9 @@ def send_upload_report(
     """
     Sends a formatted upload report to Telegram.
     """
-    safe_account = html.escape(account_name)
-    safe_channel = html.escape(channel_name)
-    safe_title = html.escape(title)
+    safe_account = html.escape(str(account_name))
+    safe_channel = html.escape(str(channel_name))
+    safe_title = html.escape(str(title))
     emoji = "✅" if status == "Success" else "❌"
     message = f"<b>{emoji} YouTube Upload Report</b>\n\n"
     message += f"<b>Account:</b> {safe_account}\n"
@@ -53,7 +64,7 @@ def send_upload_report(
         message += f"<b>URL:</b> {html.escape(str(video_url))}\n"
 
     if error_msg:
-        safe_error = html.escape(error_msg)
+        safe_error = html.escape(str(error_msg)[:1500])
         message += f"\n<b>Error:</b> <code>{safe_error}</code>"
 
     return send_telegram_message(message)
