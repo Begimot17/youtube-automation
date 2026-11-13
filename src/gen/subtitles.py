@@ -6,6 +6,7 @@ import assemblyai
 import google.generativeai as genai
 
 from src.config import Config
+from src.gen.parsing import loads_llm_json, normalize_words
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def generate_subtitles(audio_path):
             logger.error("Empty response from Gemini.")
             return []
 
-        words = json.loads(content)
+        words = normalize_words(loads_llm_json(content))
         logger.info(f"Transcription complete. Found {len(words)} words.")
         return words
 

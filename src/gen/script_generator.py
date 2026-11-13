@@ -7,6 +7,7 @@ import os
 import google.generativeai as genai
 
 from src.config import Config
+from src.gen.parsing import loads_llm_json, normalize_script
 
 # Global client and model ID
 _client = None
@@ -113,7 +114,10 @@ def generate_script(topic, language="ru"):
         )
 
         # The response should be valid JSON directly
-        data = json.loads(response.text)
+        data = normalize_script(loads_llm_json(response.text), topic)
+        if data is None:
+            logger.error(f"Gemini returned an unusable script structure for: {topic}")
+            return None
 
         logger.info(f"Successfully generated script for topic: {topic}")
         return data
