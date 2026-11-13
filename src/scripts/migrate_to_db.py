@@ -7,7 +7,37 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.config import Config
+from src.utils.channel_io import CREATE_DEFAULTS, fields_from_json
 from src.utils.db import Channel, SessionLocal, UploadHistory, init_db
+from src.utils.schedule import normalize_schedule
+
+
+def sync_channel(db, c_data):
+    """Creates or updates one channel from a channels.json entry."""
+    channel_name = c_data["channel_name"]
+    account_name = c_data.get("account_name") or channel_name
+    fields = fields_from_json(c_data)
+
+    existing = (
+        db.query(Channel)
+        .filter(
+            Channel.account_name == account_name,
+            Channel.channel_name == channel_name,
+        )
+        .first()
+    )
+    if existing:
+        for key, value in fields.items():
+            setattr(existing, key, value)
+        print(f"Updating existing channel: {account_name}/{channel_name}")
+        return existing
+
+    values = {**CREATE_DEFAULTS, **fields}
+    values.setdefault("schedule", normalize_schedule(None))
+    channel = Channel(channel_name=channel_name, account_name=account_name, **values)
+    db.add(channel)
+    print(f"Creating new channel: {account_name}/{channel_name}")
+    return channel
 
 
 def migrate():
@@ -22,74 +52,10 @@ def migrate():
             with open(Config.CHANNELS_CONFIG_PATH, "r", encoding="utf-8") as f:
                 channels_data = json.load(f)
                 for c_data in channels_data:
-                    account_name = c_data.get("account_name", c_data["channel_name"])
-                    channel_name = c_data["channel_name"]
-
-                    existing = (
-                        db.query(Channel)
-                        .filter(
-                            Channel.account_name == account_name,
-                            Channel.channel_name == channel_name,
-                        )
-                        .first()
-                    )
-                    schedule_data = c_data.get("schedule", ["08:00-20:00"])
-
-                    if not existing:
-                        channel = Channel(
-                            channel_name=channel_name,
-                            account_name=account_name,
-                            mode=c_data.get("mode", "tiktok"),
-                            gmail=c_data.get("gmail"),
-                            password=c_data.get("password"),
-                            watch_folder=c_data.get("watch_folder"),
-                            proxy=c_data.get("proxy"),
-                            upload_frequency_per_day=c_data.get(
-                                "upload_frequency_per_day", 1
-                            ),
-                            min_delay_seconds=c_data.get("min_delay_seconds", 3600),
-                            quality=c_data.get("quality", "easy"),
-                            lang=c_data.get("lang", "ru"),
-                            voice=c_data.get("voice"),
-                            description=c_data.get("description", "#shorts #tiktok"),
-                            schedule=schedule_data,
-                            tiktok_sources=c_data.get("tiktok_sources", []),
-                            genai_topics=c_data.get("genai_topics", []),
-                        )
-                        db.add(channel)
-                        print(f"Creating new channel: {account_name}/{channel_name}")
-                    else:
-                        # Update existing channel
-                        existing.mode = c_data.get("mode", existing.mode)
-                        existing.gmail = c_data.get("gmail", existing.gmail)
-                        existing.password = c_data.get("password", existing.password)
-                        existing.watch_folder = c_data.get(
-                            "watch_folder", existing.watch_folder
-                        )
-                        existing.proxy = c_data.get("proxy", existing.proxy)
-                        existing.upload_frequency_per_day = c_data.get(
-                            "upload_frequency_per_day",
-                            existing.upload_frequency_per_day,
-                        )
-                        existing.min_delay_seconds = c_data.get(
-                            "min_delay_seconds", existing.min_delay_seconds
-                        )
-                        existing.quality = c_data.get("quality", existing.quality)
-                        existing.lang = c_data.get("lang", existing.lang)
-                        existing.voice = c_data.get("voice", existing.voice)
-                        existing.description = c_data.get(
-                            "description", existing.description
-                        )
-                        existing.schedule = schedule_data
-                        existing.tiktok_sources = c_data.get(
-                            "tiktok_sources", existing.tiktok_sources
-                        )
-                        existing.genai_topics = c_data.get(
-                            "genai_topics", existing.genai_topics
-                        )
-                        print(
-                            f"Updating existing channel: {account_name}/{channel_name}"
-                        )
+                    try:
+                        sync_channel(db, c_data)
+                    except (KeyError, ValueError, TypeError) as e:
+                        print(f"Skipping invalid channel entry {c_data!r}: {e}")
 
         db.commit()
 

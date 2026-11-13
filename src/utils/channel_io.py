@@ -62,3 +62,35 @@ def apply_channel_update(channel, data):
             setattr(channel, name, data[name])
     if schedule is not None:
         channel.schedule = schedule
+
+
+JSON_FIELDS = UPDATABLE_FIELDS + ("description", "gmail")
+CREATE_DEFAULTS = {
+    "mode": "tiktok",
+    "upload_frequency_per_day": 1,
+    "min_delay_seconds": 3600,
+    "quality": "easy",
+    "lang": "ru",
+    "description": "#shorts #tiktok",
+    "tiktok_sources": [],
+    "genai_topics": [],
+}
+
+
+def is_real_password(value):
+    """False for empty values and masked placeholders such as '***' / '******'."""
+    return bool(value) and bool(str(value).strip().strip("*"))
+
+
+def fields_from_json(c_data):
+    """
+    Channel fields present in a channels.json entry. Only keys that are actually
+    in the file are returned so a re-sync never clobbers DB values with defaults;
+    masked passwords are dropped; an invalid schedule raises ValueError.
+    """
+    fields = {k: c_data[k] for k in JSON_FIELDS if k in c_data}
+    if "password" in c_data and is_real_password(c_data["password"]):
+        fields["password"] = c_data["password"]
+    if "schedule" in c_data:
+        fields["schedule"] = normalize_schedule(c_data["schedule"])
+    return fields
