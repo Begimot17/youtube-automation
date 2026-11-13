@@ -60,3 +60,16 @@ def test_schedule_all_invalid_does_not_block():
 def test_schedule_skips_invalid_but_uses_valid():
     assert not is_within_schedule(["garbage", "08:00-09:00"], time(12, 0))
     assert is_within_schedule(["garbage", "08:00-09:00"], time(8, 30))
+
+
+def test_normalize_schedule():
+    from src.utils.schedule import DEFAULT_SCHEDULE, normalize_schedule
+
+    assert normalize_schedule(None) == DEFAULT_SCHEDULE
+    assert normalize_schedule(["8:00-9:30"]) == ["08:00-09:30"]
+    assert normalize_schedule('["22:00-02:00"]') == ["22:00-02:00"]
+    assert normalize_schedule("10:00-11:00") == ["10:00-11:00"]
+    assert normalize_schedule([]) == []
+    for bad in (["x"], 5, {"a": 1}, ["08:00-25:00"]):
+        with pytest.raises(ValueError):
+            normalize_schedule(bad)

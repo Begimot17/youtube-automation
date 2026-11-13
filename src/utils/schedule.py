@@ -53,3 +53,30 @@ def is_within_schedule(schedule, now=None):
         if in_window(now, start, end):
             return True
     return valid == 0
+
+
+DEFAULT_SCHEDULE = ["08:00-20:00"]
+
+
+def normalize_schedule(value):
+    """
+    Validates user input for a channel schedule and returns a list of
+    "HH:MM-HH:MM" strings. Accepts a list, a JSON string of a list, or one
+    window string. Raises ValueError on any malformed window.
+    """
+    if value is None:
+        return list(DEFAULT_SCHEDULE)
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = [value]
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        raise ValueError("schedule must be a list of 'HH:MM-HH:MM' strings")
+    out = []
+    for entry in value:
+        start, end = parse_window(entry)
+        out.append(f"{start:%H:%M}-{end:%H:%M}")
+    return out

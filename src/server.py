@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import logging
 import os
 import shutil
@@ -11,8 +12,10 @@ from main import run_for_channel, run_full_cycle
 from src.config import Config
 from src.factory import create_content
 from src.utils.auth import is_authorized
+from src.utils.channel_io import apply_channel_update, serialize_channel
 from src.utils.db import Channel, SessionLocal, UploadHistory, init_db
 from src.utils.notifications import send_telegram_message, send_telegram_video
+from src.utils.schedule import normalize_schedule
 
 app = Flask(__name__)
 logger = logging.getLogger("server")
@@ -30,6 +33,11 @@ def require_api_token():
     if not is_authorized(request.headers, Config.API_TOKEN):
         return jsonify({"error": "Unauthorized"}), 401
     return None
+
+
+def json_body():
+    """Request JSON or None when the body is missing/invalid (never raises)."""
+    return request.get_json(silent=True)
 
 
 def start_async_task(coro, job_name="Unknown"):
@@ -93,7 +101,9 @@ def list_channels():
 @app.route("/notify", methods=["POST"])
 def notify_custom():
     """Allows sending a custom Telegram message via the API."""
-    data = request.json
+    data = json_body()
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body is required"}), 400
     msg = data.get("message")
     if not msg:
         return jsonify({"error": "Message is required"}), 400
@@ -123,7 +133,9 @@ def get_disk_usage():
 @app.route("/render/test", methods=["POST"])
 def render_test():
     """Triggers a test render without uploading."""
-    data = request.json
+    data = json_body()
+    if not isinstance(data, dict):
+        data = {}
     topic = data.get("topic", "Test Topic")
     channel = data.get("channel", "TestChannel")
     lang = data.get("lang", "ru")
@@ -140,7 +152,9 @@ def render_test():
 @app.route("/render/custom", methods=["POST"])
 def render_custom():
     """Triggers a custom video generation and sends to Telegram."""
-    data = request.json
+    data = json_body()
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body is required"}), 400
     topic = data.get("topic")
     lang = data.get("lang", "ru")
 
@@ -218,24 +232,7 @@ def get_channel():
         )
         if not c:
             return jsonify({"error": "Channel not found"}), 404
-        return jsonify(
-            {
-                "channel_name": c.channel_name,
-                "account_name": c.account_name,
-                "mode": c.mode,
-                "gmail": c.gmail,
-                "password": "******",
-                "watch_folder": c.watch_folder,
-                "proxy": c.proxy,
-                "upload_frequency_per_day": c.upload_frequency_per_day,
-                "min_delay_seconds": c.min_delay_seconds,
-                "quality": c.quality,
-                "lang": c.lang,
-                "voice": c.voice,
-                "tiktok_sources": c.tiktok_sources,
-                "genai_topics": c.genai_topics,
-            }
-        )
+        return jsonify(serialize_channel(c))
     finally:
         db.close()
 
@@ -245,9 +242,17 @@ def create_channel():
     """Creates a new channel."""
     db = SessionLocal()
     try:
-        data = request.json
-        if not data or "channel_name" not in data or "account_name" not in data:
+        data = json_body()
+        if (
+            not isinstance(data, dict)
+            or not data.get("channel_name")
+            or not data.get("account_name")
+        ):
             return jsonify({"error": "account_name and channel_name are required"}), 400
+        try:
+            schedule = normalize_schedule(data.get("schedule"))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
         existing = (
             db.query(Channel)
@@ -277,6 +282,7 @@ def create_channel():
             quality=data.get("quality", "easy"),
             lang=data.get("lang", "ru"),
             voice=data.get("voice", "ru-RU-SvetlanaNeural"),
+            schedule=schedule,
             tiktok_sources=data.get("tiktok_sources", []),
             genai_topics=data.get("genai_topics", []),
         )
@@ -339,13 +345,15 @@ def manage_config():
     db = SessionLocal()
     try:
         if request.method == "POST":
-            new_config = request.json
+            new_config = json_body()
             if not isinstance(new_config, list):
                 return jsonify(
                     {"error": "Config must be a list of channel objects"}
                 ), 400
 
             for c_data in new_config:
+                if not isinstance(c_data, dict):
+                    continue
                 account_name = c_data.get("account_name")
                 channel_name = c_data.get("channel_name")
                 if not account_name or not channel_name:
@@ -365,51 +373,18 @@ def manage_config():
                     )
                     db.add(channel)
 
-                channel.mode = c_data.get("mode", channel.mode)
-                if "gmail" in c_data:
-                    channel.gmail = c_data["gmail"]
-                if "password" in c_data:
-                    channel.password = c_data["password"]
-                channel.watch_folder = c_data.get("watch_folder", channel.watch_folder)
-                channel.proxy = c_data.get("proxy", channel.proxy)
-                channel.upload_frequency_per_day = c_data.get(
-                    "upload_frequency_per_day", channel.upload_frequency_per_day
-                )
-                channel.min_delay_seconds = c_data.get(
-                    "min_delay_seconds", channel.min_delay_seconds
-                )
-                channel.quality = c_data.get("quality", channel.quality)
-                channel.lang = c_data.get("lang", channel.lang)
-                channel.voice = c_data.get("voice", channel.voice)
-                channel.tiktok_sources = c_data.get(
-                    "tiktok_sources", channel.tiktok_sources
-                )
-                channel.genai_topics = c_data.get("genai_topics", channel.genai_topics)
+                try:
+                    apply_channel_update(channel, c_data)
+                except ValueError as e:
+                    db.rollback()
+                    return jsonify(
+                        {"error": f"{account_name}/{channel_name}: {e}"}
+                    ), 400
 
             db.commit()
             return jsonify({"status": "Database config updated successfully"})
 
-        channels = db.query(Channel).all()
-        safe_config = []
-        for c in channels:
-            safe_config.append(
-                {
-                    "channel_name": c.channel_name,
-                    "account_name": c.account_name,
-                    "mode": c.mode,
-                    "gmail": c.gmail,
-                    "password": "******",
-                    "watch_folder": c.watch_folder,
-                    "proxy": c.proxy,
-                    "upload_frequency_per_day": c.upload_frequency_per_day,
-                    "min_delay_seconds": c.min_delay_seconds,
-                    "quality": c.quality,
-                    "lang": c.lang,
-                    "voice": c.voice,
-                    "tiktok_sources": c.tiktok_sources,
-                    "genai_topics": c.genai_topics,
-                }
-            )
+        safe_config = [serialize_channel(c) for c in db.query(Channel).all()]
         return jsonify(safe_config)
     except Exception as e:
         logger.error(f"Config API Error: {e}")
@@ -453,9 +428,8 @@ def get_logs():
     if not os.path.exists(log_file):
         return jsonify({"error": "Log file not found"}), 404
     try:
-        with open(log_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            return jsonify(lines[-100:])
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            return jsonify(list(collections.deque(f, maxlen=100)))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
