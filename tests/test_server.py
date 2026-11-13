@@ -55,3 +55,39 @@ def test_logs_tail(server, tmp_path):
     )
     lines = server.app.test_client().get("/logs").get_json()
     assert len(lines) == 100 and lines[-1] == "l249\n" and lines[0] == "l150\n"
+
+
+class InlineThread:
+    def __init__(self, target, **kw):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
+def test_render_custom_escapes_topic(server, monkeypatch, tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"1")
+    sent = {}
+    monkeypatch.setattr(server.threading, "Thread", InlineThread)
+    monkeypatch.setattr(server, "create_content", lambda *a, **k: str(video))
+    monkeypatch.setattr(
+        server, "send_telegram_video", lambda p, **kw: sent.update(kw) or True
+    )
+    r = server.app.test_client().post("/render/custom", json={"topic": "a<b>&c"})
+    assert r.status_code == 200
+    assert "a&lt;b&gt;&amp;c" in sent["caption"]
+    assert sent["parse_mode"] == "HTML"
+
+
+def test_busy_start_closes_coroutine(server):
+    async def job():
+        return None
+
+    coro = job()
+    assert server.run_lock.acquire(blocking=False)
+    try:
+        assert server.start_async_task(coro, "x") is False
+    finally:
+        server.run_lock.release()
+    assert coro.cr_frame is None  # closed, so no "never awaited" warning

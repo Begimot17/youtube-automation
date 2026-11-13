@@ -85,7 +85,7 @@ def send_upload_report(
     return send_telegram_message(message)
 
 
-def send_telegram_video(video_path, caption=None):
+def send_telegram_video(video_path, caption=None, parse_mode=None):
     """
     Sends a video file via Telegram Bot API.
     """
@@ -101,6 +101,8 @@ def send_telegram_video(video_path, caption=None):
             data = {"chat_id": TELEGRAM_CHAT_ID}
             if caption:
                 data["caption"] = truncate_message(caption, TELEGRAM_CAPTION_MAX_LEN)
+                if parse_mode:
+                    data["parse_mode"] = parse_mode
 
             response = requests.post(url, data=data, files=files, timeout=180)
             response.raise_for_status()

@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import html
 import logging
 import os
 import shutil
@@ -62,7 +63,8 @@ def start_async_task(coro, job_name="Unknown"):
         except Exception as e:
             run_lock.release()
             logger.error(f"Failed to start thread: {e}")
-            return False
+    # Not started: close the coroutine so it is not reported as never awaited.
+    coro.close()
     return False
 
 
@@ -161,6 +163,9 @@ def render_custom():
     if not topic:
         return jsonify({"error": "Topic is required"}), 400
 
+    safe_topic = html.escape(str(topic))
+    safe_lang = html.escape(str(lang))
+
     def _task():
         try:
             logger.info(f"Custom render started for topic: {topic}")
@@ -170,17 +175,18 @@ def render_custom():
             if video_path and os.path.exists(video_path):
                 send_telegram_video(
                     video_path,
-                    caption=f"🎬 <b>Custom Video Ready!</b>\nTopic: {topic}\nLang: {lang}",
+                    caption=f"🎬 <b>Custom Video Ready!</b>\nTopic: {safe_topic}\nLang: {safe_lang}",
+                    parse_mode="HTML",
                 )
                 logger.info(f"Custom video sent to Telegram: {video_path}")
             else:
                 send_telegram_message(
-                    f"❌ <b>Generation Failed</b>\nTopic: {topic}\nCould not create video."
+                    f"❌ <b>Generation Failed</b>\nTopic: {safe_topic}\nCould not create video."
                 )
         except Exception as e:
             logger.error(f"Error in custom render task: {e}")
             send_telegram_message(
-                f"❌ <b>Error</b>\nTopic: {topic}\nError: <code>{str(e)}</code>"
+                f"❌ <b>Error</b>\nTopic: {safe_topic}\nError: <code>{html.escape(str(e))}</code>"
             )
 
     # We use a standard thread for this specific one since it's not a standard job

@@ -113,3 +113,12 @@ def test_video_caption_is_truncated(configured, monkeypatch, tmp_path):
     monkeypatch.setattr(n.requests, "post", lambda url, **kw: seen.update(kw["data"]) or Resp())
     assert n.send_telegram_video(str(f), caption="c" * 2000) is True
     assert len(seen["caption"]) == n.TELEGRAM_CAPTION_MAX_LEN
+
+
+def test_video_parse_mode_passed(configured, monkeypatch, tmp_path):
+    f = tmp_path / "v.mp4"
+    f.write_bytes(b"1")
+    seen = {}
+    monkeypatch.setattr(n.requests, "post", lambda url, **kw: seen.update(kw["data"]) or Resp())
+    assert n.send_telegram_video(str(f), caption="<b>x</b>", parse_mode="HTML") is True
+    assert seen["parse_mode"] == "HTML"
