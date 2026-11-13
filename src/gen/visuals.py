@@ -12,6 +12,36 @@ logger = logging.getLogger(__name__)
 PEXELS_API_KEY = Config.PEXELS_API_KEY
 
 
+REQUEST_TIMEOUT = 30
+
+
+def pick_video_link(files):
+    """
+    Chooses a download link from Pexels `video_files`. Prefers a 1080-wide /
+    1920-tall rendition, otherwise the first file that has a link. None if empty.
+    """
+    links = [f for f in (files or []) if isinstance(f, dict) and f.get("link")]
+    if not links:
+        return None
+    for f in links:
+        if f.get("width") == 1080 or f.get("height") == 1920:
+            return f["link"]
+    return links[0]["link"]
+
+
+def filter_videos(videos, duration_min=3, duration_max=None):
+    """Keeps videos whose duration is within [duration_min, duration_max]."""
+    out = []
+    for v in videos or []:
+        dur = v.get("duration")
+        if not isinstance(dur, (int, float)) or dur < duration_min:
+            continue
+        if duration_max is not None and dur > duration_max:
+            continue
+        out.append(v)
+    return out
+
+
 def search_pexels_videos(
     query, orientation="portrait", size="medium", duration_min=3, duration_max=15
 ):
@@ -33,18 +63,15 @@ def search_pexels_videos(
     }
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(
+            url, headers=headers, params=params, timeout=REQUEST_TIMEOUT
+        )
         response.raise_for_status()
         data = response.json()
 
         videos = data.get("videos", [])
-        valid_videos = []
-
-        for v in videos:
-            if v["duration"] >= duration_min:
-                valid_videos.append(v)
-
-        return valid_videos
+        # duration_max is accepted for API compatibility but not enforced (clips are cropped later)
+        return filter_videos(videos, duration_min)
 
     except Exception as e:
         logger.error(f"Error searching Pexels: {e}")
@@ -57,7 +84,7 @@ def download_video(video_url, output_path):
     """
     try:
         logger.info(f"Downloading visual: {output_path}...")
-        response = requests.get(video_url, stream=True)
+        response = requests.get(video_url, stream=True, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
 
         output_path = Path(output_path)
@@ -96,7 +123,7 @@ def get_stock_footage(keyword, output_filename, used_urls=None):
 
     if videos:
         # Filter out already used videos
-        available_videos = [v for v in videos if v["url"] not in used_urls]
+        available_videos = [v for v in videos if v.get("url") not in used_urls]
 
         if not available_videos:
             logger.warning("All fetched videos were already used. Re-using one.")
@@ -106,19 +133,12 @@ def get_stock_footage(keyword, output_filename, used_urls=None):
         video = random.choice(available_videos)
 
         # Get the best quality link
-        files = video["video_files"]
-        if not files:
+        video_url = pick_video_link(video.get("video_files"))
+        if not video_url:
             return None, None
 
-        # Prefer HD/FullHD links if possible, else take first
-        video_url = files[0]["link"]
-        for f in files:
-            if f.get("width") == 1080 or f.get("height") == 1920:
-                video_url = f["link"]
-                break
-
         path = download_video(video_url, output_filename)
-        return path, video["url"]
+        return path, video.get("url")
 
     return None, None
 
