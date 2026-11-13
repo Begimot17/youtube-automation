@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import random
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -14,6 +13,7 @@ from src.upload_engine.playwright_uploader import (
 )
 from src.utils import schedule as schedule_utils
 from src.utils.db import Channel, SessionLocal, UploadHistory
+from src.utils.items import pick_topic, tiktok_title, upload_allowed
 from src.utils.logging_config import setup_logging
 from src.utils.notifications import send_telegram_message, send_upload_report
 
@@ -79,23 +79,16 @@ def can_upload(channel, db):
         )
         return False
 
-    freq = channel.upload_frequency_per_day or 1
-    min_delay = channel.min_delay_seconds or 3600
-
     recent_uploads = get_channel_uploads_last_24h(db, channel.id)
-    if len(recent_uploads) >= freq:
-        logger.info(
-            f"Skipping {channel.account_name}/{channel.channel_name}: Daily limit reached ({len(recent_uploads)}/{freq})"
-        )
-        return False
-
-    last_time = get_last_upload_time(db, channel.id)
-    now = time.time()
-    if now - last_time < min_delay:
-        remaining = int(min_delay - (now - last_time))
-        logger.info(
-            f"Skipping {channel.account_name}/{channel.channel_name}: Minimum delay active. Wait {remaining}s"
-        )
+    allowed, reason = upload_allowed(
+        len(recent_uploads),
+        channel.upload_frequency_per_day,
+        get_last_upload_time(db, channel.id),
+        time.time(),
+        channel.min_delay_seconds,
+    )
+    if not allowed:
+        logger.info(f"Skipping {channel.account_name}/{channel.channel_name}: {reason}")
         return False
 
     return True
@@ -129,7 +122,7 @@ async def process_tiktok_channel(channel, downloader, db):
             os.makedirs(watch_folder, exist_ok=True)
 
             if await downloader.download_video(video, output_path):
-                title = video.get("title", "")[:70] + " #shorts #tiktok"
+                title = tiktok_title(video.get("title"))
                 password = channel.password or os.environ.get(
                     f"YT_PASSWORD_{account_name.upper()}", ""
                 )
@@ -145,6 +138,7 @@ async def process_tiktok_channel(channel, downloader, db):
                         verify_login_status,
                         gmail=channel.gmail,
                         password=password,
+                        proxy=proxy,
                         headless=False,
                         account_name=account_name,
                     )
@@ -185,14 +179,12 @@ async def process_tiktok_channel(channel, downloader, db):
 
 def _pick_unprocessed_topic(channel, db, topics, prefix="genai"):
     """Returns (topic, item_id) for the first unprocessed topic, or (None, None)."""
-    lang = channel.lang or "ru"
-    shuffled = list(topics)
-    random.shuffle(shuffled)
-    for t in shuffled:
-        item_id = f"{prefix}_{t.replace(' ', '_').lower()}_{lang}"
-        if not is_item_processed(db, channel.id, item_id):
-            return t, item_id
-    return None, None
+    return pick_topic(
+        topics,
+        lambda item_id: is_item_processed(db, channel.id, item_id),
+        prefix,
+        channel.lang or "ru",
+    )
 
 
 async def process_genai_channel(channel, db):
@@ -206,6 +198,7 @@ async def process_genai_channel(channel, db):
         verify_login_status,
         gmail=channel.gmail,
         password=password,
+        proxy=channel.proxy,
         headless=False,
         account_name=account_name,
     )
@@ -286,6 +279,7 @@ async def process_gen_v2_channel(channel, db):
         verify_login_status,
         gmail=channel.gmail,
         password=password,
+        proxy=channel.proxy,
         headless=False,
         account_name=account_name,
     )

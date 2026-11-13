@@ -1,36 +1,20 @@
-import functools
 import logging
 import os
 import threading
 import time
-import traceback
 
 from playwright.sync_api import sync_playwright
 
+from src.upload_engine.helpers import (
+    clamp_title,
+    cookies_path_for,
+    css_quote,
+    parse_proxy,
+    retry_step,
+    xpath_literal,
+)
+
 logger = logging.getLogger(__name__)
-
-
-def retry_step(max_attempts=3, base_delay=2.0, step_name="step"):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return fn(*args, **kwargs)
-                except Exception as e:
-                    wait = base_delay ** attempt
-                    logger.warning(
-                        f"[RETRY] '{step_name}' attempt {attempt}/{max_attempts}: {e}. Wait {wait:.1f}s"
-                    )
-                    if attempt == max_attempts:
-                        logger.error(
-                            f"[FAILED] '{step_name}' exhausted all {max_attempts} attempts.\n"
-                            f"{traceback.format_exc()}"
-                        )
-                        raise
-                    time.sleep(wait)
-        return wrapper
-    return decorator
 
 
 def input_with_timeout(prompt, timeout):
@@ -38,7 +22,10 @@ def input_with_timeout(prompt, timeout):
     result = [None]
 
     def get_input():
-        result[0] = input().lower().strip()
+        try:
+            result[0] = input().lower().strip()
+        except EOFError:  # no stdin (service/container): behave like a timeout
+            result[0] = "n"
 
     thread = threading.Thread(target=get_input)
     thread.daemon = True
@@ -56,12 +43,15 @@ def verify_login_status(gmail, password, proxy=None, headless=False, account_nam
     Checks if we are logged into YouTube. If not, attempts automatic login.
     If it requires manual intervention (2FA, etc), opens browser and asks user.
     """
-    cookies_path = f"auth/{account_name}.json"
+    cookies_path = cookies_path_for(account_name)
     logger.info(f"Verifying login for {account_name} ({gmail}), cookies: {cookies_path}")
 
     with sync_playwright() as p:
         browser_args = ["--disable-blink-features=AutomationControlled"]
-        browser = p.chromium.launch(headless=headless, args=browser_args)
+        launch_kwargs = {"headless": headless, "args": browser_args}
+        if parse_proxy(proxy):
+            launch_kwargs["proxy"] = parse_proxy(proxy)
+        browser = p.chromium.launch(**launch_kwargs)
 
         context_options = {
             "viewport": {"width": 1280, "height": 720},
@@ -84,7 +74,8 @@ def verify_login_status(gmail, password, proxy=None, headless=False, account_nam
 
                 if headless:
                     browser.close()
-                    browser = p.chromium.launch(headless=False, args=browser_args)
+                    launch_kwargs["headless"] = False
+                    browser = p.chromium.launch(**launch_kwargs)
                     context = browser.new_context(**context_options)
                     page = context.new_page()
                     page.goto("https://www.youtube.com/upload", timeout=300000)
@@ -142,7 +133,7 @@ def _step_switch_channel(page, channel_name, account_name):
     page.goto("https://www.youtube.com/channel_switcher", timeout=120000)
     try:
         # Primary: CSS has-text (Playwright CSS extension)
-        channel_item = page.locator(f"ytd-account-item-renderer:has-text('{channel_name}')").first
+        channel_item = page.locator(f"ytd-account-item-renderer:has-text('{css_quote(channel_name)}')").first
         if not channel_item.is_visible(timeout=5000):
             raise Exception("not visible via CSS")
         channel_item.click()
@@ -150,7 +141,7 @@ def _step_switch_channel(page, channel_name, account_name):
         try:
             # Fallback: XPath
             channel_item = page.locator(
-                f"//ytd-account-item-renderer[contains(., '{channel_name}')]"
+                f"//ytd-account-item-renderer[contains(., {xpath_literal(channel_name)})]"
             ).first
             channel_item.click()
         except Exception as e:
@@ -331,11 +322,11 @@ def upload_video_via_browser(
     Uploads a video to YouTube using Playwright.
     Returns the video URL string on success, or raises on failure.
     """
-    cookies_path = f"auth/{account_name}.json"
+    cookies_path = cookies_path_for(account_name)
     channel_name = metadata.get("channel_name")
     gmail = metadata.get("gmail")
     password = metadata.get("password")
-    title = metadata.get("title", "New Video")
+    title = clamp_title(metadata.get("title", "New Video"))
     description = metadata.get("description", "")
 
     logger.info(f"Uploading '{video_path}' → {account_name}/{channel_name}")
@@ -343,7 +334,10 @@ def upload_video_via_browser(
     with sync_playwright() as p:
         browser_args = ["--disable-blink-features=AutomationControlled"]
         slow_mo = int(os.environ.get("PLAYWRIGHT_SLOW_MO", 0))
-        browser = p.chromium.launch(headless=headless, args=browser_args, slow_mo=slow_mo)
+        launch_kwargs = {"headless": headless, "args": browser_args, "slow_mo": slow_mo}
+        if parse_proxy(proxy):
+            launch_kwargs["proxy"] = parse_proxy(proxy)
+        browser = p.chromium.launch(**launch_kwargs)
 
         context_options = {
             "viewport": {"width": 1280, "height": 720},
