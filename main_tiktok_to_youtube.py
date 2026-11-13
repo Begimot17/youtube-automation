@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from src.config import Config
 from src.sources.tiktok_downloader import TikTokDownloader
 from src.upload_engine.playwright_uploader import upload_video_via_browser
+from src.utils.items import tiktok_title
 from src.utils.logging_config import setup_logging
 
 # Load environment variables
@@ -55,7 +56,6 @@ async def process_channel(channel, downloader, history):
     channel_name = channel.get("channel_name")
     tiktok_sources = channel.get("tiktok_sources", [])
     watch_folder = channel.get("watch_folder", "input_videos")
-    cookies = channel.get("cookies_path")
     proxy = channel.get("proxy")
 
     if not tiktok_sources:
@@ -93,18 +93,18 @@ async def process_channel(channel, downloader, history):
 
             # 2. Upload to YouTube
             # Use TikTok caption as title, add common hashtags
-            tt_title = video.get("title", f"TikTok by @{tt_user}")
-            # Limit title to 100 chars
-            yt_title = (
-                (tt_title[:90] + " #shorts #tiktok")
-                if len(tt_title) < 90
-                else (tt_title[:70] + "... #shorts")
-            )
+            yt_title = tiktok_title(video.get("title") or f"TikTok by @{tt_user}")
 
-            description = channel.get("description", "#shorts #tiktok")
+            account_name = channel.get("account_name") or channel_name
+            password = channel.get("password") or os.environ.get(
+                f"YT_PASSWORD_{str(account_name).upper()}", ""
+            )
             metadata = {
                 "title": yt_title,
-                "description": description,
+                "description": channel.get("description", "#shorts #tiktok"),
+                "gmail": channel.get("gmail"),
+                "password": password,
+                "channel_name": channel_name,
             }
 
             logger.info(f"Uploading to YouTube: {yt_title}")
@@ -116,8 +116,8 @@ async def process_channel(channel, downloader, history):
                     video_path=os.path.abspath(output_path),
                     metadata=metadata,
                     proxy=proxy,
-                    cookies_path=cookies,
                     headless=False,  # Set to True once verified
+                    account_name=account_name,
                 )
 
                 # 3. Mark as processed
