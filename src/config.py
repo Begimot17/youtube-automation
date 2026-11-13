@@ -9,6 +9,29 @@ load_dotenv()
 logger = logging.getLogger("config")
 
 
+def env_int(name, default, minimum=None):
+    """Reads an int env var; falls back to `default` on missing/invalid/too-small values."""
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        logger.warning(f"Invalid integer for {name}={raw!r}, using {default}")
+        return default
+    if minimum is not None and value < minimum:
+        logger.warning(f"{name}={value} is below {minimum}, using {default}")
+        return default
+    return value
+
+
+def env_bool(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("true", "1", "t", "yes", "y", "on")
+
+
 class Config:
     CHANNELS_CONFIG_PATH = os.environ.get(
         "CHANNELS_CONFIG_PATH", "config/channels.json"
@@ -33,7 +56,7 @@ class Config:
 
     # Database
     DB_TYPE = os.environ.get("DB_TYPE", "mysql").lower()
-    TIKTOK_DOWNLOAD_COUNT = os.environ.get("TIKTOK_DOWNLOAD_COUNT", 2)
+    TIKTOK_DOWNLOAD_COUNT = env_int("TIKTOK_DOWNLOAD_COUNT", 2, minimum=1)
     # Default for local dev if not in docker
     DEFAULT_DB = "mysql+mysqlconnector://user:user_password@localhost:3307/automation"
 
@@ -45,10 +68,10 @@ class Config:
         DATABASE_URL = os.environ.get("DATABASE_URL") or DEFAULT_DB
 
     # Server
-    PORT = int(os.environ.get("PORT", 5000))
+    PORT = env_int("PORT", 5000, minimum=1)
 
     # Debug mode
-    DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
+    DEBUG = env_bool("DEBUG", False)
 
     @classmethod
     def validate(cls):
