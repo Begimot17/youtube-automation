@@ -29,6 +29,7 @@ SEED_NODE_ID = "3"         # KSampler node
 
 MAX_POLL_SECONDS = 600  # 10 minutes
 POLL_INTERVAL = 5
+FAILED_STATUSES = ("FAILED", "CANCELLED", "TIMED_OUT")
 
 
 # ---------------------------------------------------------------------------
@@ -105,9 +106,19 @@ def generate_scene(action_prompt: str, output_filename: str) -> str:
     job_id = data["id"]
     logger.info(f"gen_v2: job submitted (ID: {job_id}). Polling...")
 
-    start = time.time()
     status_url = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/status/{job_id}"
+    output = poll_job(job_id, status_url, headers)
+    _save_output(output, output_filename)
+    logger.info(f"gen_v2: saved → {output_filename}")
+    return output_filename
 
+
+def poll_job(job_id, status_url, headers):
+    """
+    Polls RunPod until the job finishes and returns its `output` dict.
+    Raises RuntimeError on FAILED/CANCELLED/TIMED_OUT and TimeoutError past MAX_POLL_SECONDS.
+    """
+    start = time.time()
     while True:
         elapsed = time.time() - start
         if elapsed > MAX_POLL_SECONDS:
@@ -123,28 +134,29 @@ def generate_scene(action_prompt: str, output_filename: str) -> str:
 
         if status == "COMPLETED":
             logger.info(f"gen_v2: job {job_id} COMPLETED ({int(elapsed)}s elapsed)")
-            _save_output(status_data.get("output", {}), output_filename)
-            logger.info(f"gen_v2: saved → {output_filename}")
-            return output_filename
+            return status_data.get("output") or {}
 
-        elif status == "FAILED":
+        if status in FAILED_STATUSES:
             error_detail = status_data.get("error", "no detail")
-            raise RuntimeError(f"RunPod job {job_id} FAILED: {error_detail}")
+            raise RuntimeError(f"RunPod job {job_id} {status}: {error_detail}")
 
-        elif status in ("IN_QUEUE", "IN_PROGRESS"):
+        if status in ("IN_QUEUE", "IN_PROGRESS"):
             logger.debug(f"gen_v2: [{int(elapsed)}s] status={status}")
-
         else:
             logger.warning(f"gen_v2: unknown status '{status}' for job {job_id}")
 
 
 def _save_output(output: dict, output_filename: str) -> None:
+    if not isinstance(output, dict):
+        raise ValueError(f"Could not parse output from RunPod response: {output!r}")
     saved = False
 
     # Format 1: {"images": [{"filename": "x.png", "data": "<base64>"}]}
     images_list = output.get("images", [])
     if images_list and isinstance(images_list, list):
         for img_obj in images_list:
+            if not isinstance(img_obj, dict):
+                continue
             img_data = img_obj.get("data") or img_obj.get("image")
             if img_data:
                 with open(output_filename, "wb") as f:
