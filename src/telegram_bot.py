@@ -1,19 +1,89 @@
+"""Telegram control bot for the automation API.
+
+Started on demand (``python src/telegram_bot.py``) and stopped when idle, so it
+must reach polling quickly and log every incoming command at INFO: the idle
+watchdog reads the log for activity and ignores the getUpdates polling lines.
+"""
+
+import os
+import sys
+import time
+
+_STARTED_AT = time.perf_counter()
+
+if __name__ == "__main__":
+    # Run as a script: the script's own folder (src/) must not shadow top-level
+    # packages, and the project root must be importable even without PYTHONPATH.
+    _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+    _ROOT_DIR = os.path.dirname(_SRC_DIR)
+    sys.path[:] = [
+        p for p in sys.path if os.path.normcase(os.path.abspath(p or ".")) != os.path.normcase(_SRC_DIR)
+    ]
+    if _ROOT_DIR not in sys.path:
+        sys.path.insert(0, _ROOT_DIR)
+    # Relative paths in Config (data/, .env lookup) resolve against the project.
+    os.chdir(_ROOT_DIR)
+
 import html
 import json
 import logging
 
 import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    TypeHandler,
+)
 
 from src.config import Config
 from src.utils.formatting import format_log_tail
 
-# Logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
 logger = logging.getLogger("telegram_bot")
+
+# Commands whose arguments may carry secrets and must not reach the log.
+_REDACTED_ARG_COMMANDS = {"add_channel"}
+
+
+def configure_logging():
+    """INFO to stderr; silence per-request HTTP logs (one getUpdates line per poll)."""
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        stream=sys.stderr,
+    )
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+def describe_update(update):
+    """Short, secret-free description of an incoming update for the log."""
+    chat = getattr(update, "effective_chat", None)
+    chat_id = chat.id if chat else None
+    query = getattr(update, "callback_query", None)
+    if query is not None:
+        return f"button {query.data!r} from chat {chat_id}"
+    message = getattr(update, "effective_message", None)
+    text = (getattr(message, "text", None) or "").strip()
+    if text.startswith("/"):
+        command, *args = text.split()
+        name = command[1:].split("@", 1)[0].lower()
+        if args and name in _REDACTED_ARG_COMMANDS:
+            shown = "<redacted>"
+        else:
+            shown = " ".join(args)
+            if len(shown) > 200:
+                shown = shown[:200] + "..."
+        return f"command {command} {shown}".rstrip() + f" from chat {chat_id}"
+    if text:
+        return f"text message ({len(text)} chars) from chat {chat_id}"
+    return f"update {getattr(update, 'update_id', '?')} from chat {chat_id}"
+
+
+async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Incoming %s", describe_update(update))
 
 
 TOKEN = Config.TELEGRAM_BOT_TOKEN
@@ -345,12 +415,11 @@ async def disk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error fetching disk stats: {e}")
 
 
-def main():
-    if not TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN not found.")
-        return
+def build_application(token):
+    application = Application.builder().token(token).build()
 
-    application = Application.builder().token(TOKEN).build()
+    # Group -1 runs before the command handlers, for every update.
+    application.add_handler(TypeHandler(Update, log_update), group=-1)
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", start_command))
@@ -366,10 +435,23 @@ def main():
     application.add_handler(CommandHandler("disk", disk_command))
 
     application.add_handler(CallbackQueryHandler(button_callback))
+    return application
 
-    logger.info("Bot started and waiting for commands...")
+
+def main():
+    configure_logging()
+    if not TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN not found.")
+        return 1
+
+    application = build_application(TOKEN)
+    logger.info(
+        "Bot started in %.2fs, polling for commands...",
+        time.perf_counter() - _STARTED_AT,
+    )
     application.run_polling()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
