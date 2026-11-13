@@ -3,9 +3,23 @@ import logging
 from pathlib import Path
 
 import edge_tts
-import nest_asyncio
 
 logger = logging.getLogger(__name__)
+
+
+def _run(coro):
+    """Runs a coroutine from sync code, also when an event loop is already running."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    import nest_asyncio
+
+    nest_asyncio.apply()
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+DEFAULT_VOICES = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AriaNeural"}
 
 
 def generate_voiceover(text, output_path, lang="en", voice=None):
@@ -14,10 +28,11 @@ def generate_voiceover(text, output_path, lang="en", voice=None):
     """
     if not voice:
         # Default voices if none provided
-        if lang == "ru":
-            voice = "ru-RU-SvetlanaNeural"
-        else:
-            voice = "en-US-AriaNeural"
+        voice = DEFAULT_VOICES.get(lang, DEFAULT_VOICES["en"])
+
+    if not text or not str(text).strip():
+        logger.error("Cannot generate voiceover from empty text.")
+        return None
 
     logger.info(f"Generating voiceover ({voice}): {output_path}")
 
@@ -30,13 +45,7 @@ def generate_voiceover(text, output_path, lang="en", voice=None):
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(str(output_path))
 
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                nest_asyncio.apply()
-            asyncio.run(_generate())
-        except Exception:
-            asyncio.run(_generate())
+        _run(_generate())
 
         logger.info(f"Audio saved to {output_path}")
         return output_path
