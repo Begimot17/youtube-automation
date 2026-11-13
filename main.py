@@ -12,6 +12,7 @@ from src.upload_engine.playwright_uploader import (
     upload_video_via_browser,
     verify_login_status,
 )
+from src.utils import schedule as schedule_utils
 from src.utils.db import Channel, SessionLocal, UploadHistory
 from src.utils.logging_config import setup_logging
 from src.utils.notifications import send_telegram_message, send_upload_report
@@ -68,24 +69,7 @@ def mark_item_processed(db, channel_id, item_id):
 
 def is_within_schedule(channel):
     """Checks if the current time is within the channel's upload schedule."""
-    schedule = channel.schedule
-    if not schedule:
-        return True  # No schedule means upload anytime
-
-    now = datetime.now().time()
-    for time_range in schedule:
-        try:
-            start_str, end_str = time_range.split("-")
-            start_time = datetime.strptime(start_str, "%H:%M").time()
-            end_time = datetime.strptime(end_str, "%H:%M").time()
-            if start_time <= now <= end_time:
-                return True
-        except ValueError:
-            logger.warning(
-                f"Invalid schedule format for {channel.account_name}/{channel.channel_name}: {time_range}"
-            )
-            continue
-    return False
+    return schedule_utils.is_within_schedule(channel.schedule)
 
 
 def can_upload(channel, db):
