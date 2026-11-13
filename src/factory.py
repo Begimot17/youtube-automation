@@ -6,6 +6,7 @@ import time
 # Add project root to sys.path to support 'from src...' imports when run directly
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from src.gen import scenes as scenes_module
 from src.gen import script_generator, subtitles, tts, visuals
 from src.rendering.engine import VideoRenderer
 
@@ -37,6 +38,9 @@ def create_content(
         return None
 
     script_text = script_data.get("script", "")
+    if not script_text.strip():
+        logger.error("Script is empty.")
+        return None
     logger.info(f"Script length: {len(script_text)} chars")
 
     # 2. Audio
@@ -51,33 +55,12 @@ def create_content(
 
     # 4. Visuals
     logger.info("Step 4: Fetching Visuals")
-    visual_paths = []
-    used_visual_urls = set()
-    scenes = script_data.get("scenes", [])
-
-    # Track downloaded clips to ensure we don't repeat the same clip too often
-    for i, scene in enumerate(scenes):
-        scene_keywords = scene.get("keywords", [])
-        if not scene_keywords:
-            scene_keywords = [topic]
-
-        # Fetch up to 2 unique visuals per scene to ensure variety
-        for k in range(min(len(scene_keywords), 2)):
-            query = scene_keywords[k]
-            v_path = os.path.join(base_dir, f"scene_{i}_v{k}.mp4")
-
-            downloaded, video_url = visuals.get_stock_footage(
-                query, v_path, used_urls=used_visual_urls
-            )
-            if downloaded:
-                visual_paths.append(downloaded)
-                used_visual_urls.add(video_url)
-                logger.info(f"Downloaded unique visual for: {query}")
-                # We stop at 1 if it's broad enough, but for complex topics we take 2
-                if k >= 0:  # Change to 1 if you want exactly 2 per scene
-                    break
-            else:
-                logger.warning(f"Could not download visual for {query}")
+    visual_paths = scenes_module.collect_visuals(
+        script_data.get("scenes", []),
+        topic,
+        base_dir,
+        lambda query, out, used: visuals.get_stock_footage(query, out, used_urls=used),
+    )
 
     if not visual_paths:
         logger.error("No visuals downloaded.")
